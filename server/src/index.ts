@@ -8,6 +8,7 @@ import { query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(cors({ origin: config.webOrigin, credentials: true }));
 app.use(securityHeaders);
 app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly."));

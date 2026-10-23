@@ -90,3 +90,20 @@ npm run dev
 The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. Notifications and complete frontend synchronization remain the next backend slices.
 
 To enable the API-backed authentication path in the frontend, copy `.env.example` to `.env` in the project root and run the Vite app after starting the API. Without `VITE_API_URL`, the app intentionally continues using its local demo authentication.
+
+## Deploy on Render free tier
+
+The repository includes `render.yaml` for a Render Blueprint with two services:
+
+- `gura-api`: Node/Express API running from `server/`
+- `gura-web`: React/Vite static site with SPA route rewrites
+
+To deploy:
+
+1. Push the repository to GitHub (already configured for `ahumuzaJohnbaptist5/GuraProject`).
+2. In Render, choose **New > Blueprint**, connect the repository, and select the `main` branch.
+3. When prompted for `DATABASE_URL`, enter the Supabase pooled PostgreSQL connection string. Use the transaction pooler URL for the API runtime.
+4. Apply the Blueprint. Render wires `VITE_API_URL` to the API public URL and `WEB_ORIGIN` to the frontend public URL.
+5. After deployment, verify `/health` on the API URL and open the frontend URL.
+
+Do not commit `.env` files or Supabase secret keys. The Blueprint intentionally marks `DATABASE_URL` as a secret input. Static-site environment variables are injected at build time, so redeploy the frontend after changing the API URL.
