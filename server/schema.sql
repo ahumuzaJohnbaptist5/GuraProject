@@ -82,3 +82,10 @@ CREATE INDEX IF NOT EXISTS requests_customer_idx ON service_requests(customer_id
 CREATE INDEX IF NOT EXISTS requests_provider_idx ON service_requests(provider_id);
 CREATE INDEX IF NOT EXISTS messages_request_idx ON messages(request_id, created_at);
 CREATE INDEX IF NOT EXISTS reviews_listing_idx ON reviews(listing_id, created_at);
+
+INSERT INTO listings (id, name, type, location, text, services, verified, rating, availability, moderation_status)
+VALUES
+  ('00000000-0000-0000-0000-000000000001', 'Maya Tech Care', 'technician', 'Central district', 'Laptop diagnostics, phone repairs, and patient explanations.', ARRAY['Laptop repair', 'Phone repair', 'Diagnostics'], TRUE, 4.9, 'Weekdays · 09:00–17:00', 'approved'),
+  ('00000000-0000-0000-0000-000000000002', 'Circuit Corner', 'shop', 'Market street', 'Accessories, refurbished devices, and everyday essentials.', ARRAY['Accessories', 'Refurbished devices', 'Trade-ins'], TRUE, 4.7, 'Mon–Sat · 10:00–18:00', 'approved'),
+  ('00000000-0000-0000-0000-000000000003', 'Sam''s Smart Finds', 'seller', 'West side', 'Carefully tested laptops and phones looking for a second life.', ARRAY['Used laptops', 'Used phones', 'Device testing'], FALSE, 4.6, 'By appointment', 'approved')
+ON CONFLICT (id) DO NOTHING;

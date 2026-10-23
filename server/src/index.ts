@@ -113,6 +113,116 @@ app.get("/api/listings", asyncRoute(async (_request, response) => {
   response.json({ listings: result.rows });
 }));
 
+const listingInputSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  type: z.enum(["technician", "shop", "seller"]),
+  location: z.string().trim().min(2).max(160),
+  text: z.string().trim().min(3).max(4000),
+  services: z.array(z.string().trim().min(1).max(80)).max(20),
+  availability: z.string().trim().max(160).nullable().optional(),
+});
+
+const listingSelect = `id, owner_id AS "ownerId", name, type, location, text, services,
+  verified, rating, availability, moderation_status AS "moderationStatus"`;
+
+app.get("/api/admin/listings", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const result = await query(`SELECT ${listingSelect}, created_at AS "createdAt" FROM listings ORDER BY created_at DESC`);
+  response.json({ listings: result.rows });
+}));
+
+app.post("/api/listings", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (!["technician", "shop"].includes(user.role)) {
+    response.status(403).json({ error: "Only technicians and shops can create listings." });
+    return;
+  }
+  const input = listingInputSchema.parse(request.body);
+  const type = user.role === "technician" ? "technician" : "shop";
+  if (input.type !== type) {
+    response.status(400).json({ error: "Listing type must match the provider role." });
+    return;
+  }
+  const result = await query(
+    `INSERT INTO listings (owner_id, name, type, location, text, services, availability)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING ${listingSelect}`,
+    [user.id, input.name, input.type, input.location, input.text, input.services, input.availability ?? null],
+  );
+  response.status(201).json({ listing: result.rows[0] });
+}));
+
+app.patch("/api/listings/:id", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  const listingId = String(request.params.id);
+  const input = listingInputSchema.partial().parse(request.body);
+  const existing = await query<{ owner_id: string | null }>("SELECT owner_id FROM listings WHERE id = $1", [listingId]);
+  if (!existing.rows[0]) {
+    response.status(404).json({ error: "Listing not found." });
+    return;
+  }
+  if (user.role !== "administrator" && existing.rows[0].owner_id !== user.id) {
+    response.status(403).json({ error: "Only the listing owner can edit this listing." });
+    return;
+  }
+  const result = await query(
+    `UPDATE listings SET
+      name = COALESCE($1, name), type = COALESCE($2, type), location = COALESCE($3, location),
+      text = COALESCE($4, text), services = COALESCE($5, services), availability = COALESCE($6, availability),
+      moderation_status = CASE WHEN $7 = 'administrator' THEN moderation_status ELSE 'pending' END,
+      verified = CASE WHEN $7 = 'administrator' THEN verified ELSE false END
+     WHERE id = $8
+     RETURNING ${listingSelect}`,
+    [input.name ?? null, input.type ?? null, input.location ?? null, input.text ?? null,
+      input.services ?? null, input.availability ?? null, user.role, listingId],
+  );
+  response.json({ listing: result.rows[0] });
+}));
+
+app.post("/api/listings/:id/claim", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (!["technician", "shop"].includes(user.role)) {
+    response.status(403).json({ error: "Only providers can claim listings." });
+    return;
+  }
+  const listingId = String(request.params.id);
+  const result = await query(
+    `UPDATE listings SET owner_id = $1, moderation_status = 'pending', verified = false
+     WHERE id = $2 AND owner_id IS NULL AND type = $3
+     RETURNING ${listingSelect}`,
+    [user.id, listingId, user.role === "technician" ? "technician" : "shop"],
+  );
+  if (!result.rows[0]) {
+    response.status(409).json({ error: "Listing is unavailable or does not match your provider role." });
+    return;
+  }
+  response.json({ listing: result.rows[0] });
+}));
+
+app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const input = z.object({ moderationStatus: z.enum(["approved", "rejected", "pending"]), verified: z.boolean().optional() }).parse(request.body);
+  const result = await query(
+    `UPDATE listings SET moderation_status = $1, verified = COALESCE($2, verified)
+     WHERE id = $3
+     RETURNING ${listingSelect}`,
+    [input.moderationStatus, input.verified ?? null, String(request.params.id)],
+  );
+  if (!result.rows[0]) {
+    response.status(404).json({ error: "Listing not found." });
+    return;
+  }
+  response.json({ listing: result.rows[0] });
+}));
+
 app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
   const user = response.locals.user as AuthUser;
   const input = z.object({

@@ -136,15 +136,42 @@ export const toggleFavorite = (userId: string, listingId: string) => {
   return favorites[userId];
 };
 export const createListing = (listing: Listing) => {
+  if (useApi) {
+    void apiRequest<{ listing: Listing }>("/api/listings", {
+      method: "POST",
+      body: JSON.stringify({
+        name: listing.name,
+        type: listing.type,
+        location: listing.location,
+        text: listing.text,
+        services: listing.services,
+        availability: listing.availability || null,
+      }),
+    }).then(({ listing: created }) => {
+      write(LISTINGS_KEY, [created, ...listListings().filter((item) => item.id !== listing.id)]);
+    }).catch((error) => console.error("Unable to create API listing", error));
+  }
   const next = [listing, ...listListings()];
   write(LISTINGS_KEY, next);
   return listing;
 };
 export const updateListingStatus = (id: string, moderationStatus: Listing["moderationStatus"]) => {
+  if (useApi && moderationStatus) {
+    void apiRequest<{ listing: Listing }>(`/api/admin/listings/${id}/moderation`, {
+      method: "PATCH",
+      body: JSON.stringify({ moderationStatus }),
+    }).catch((error) => console.error("Unable to moderate API listing", error));
+  }
   const next = listListings().map((listing) => listing.id === id ? { ...listing, moderationStatus, verified: moderationStatus === "approved" ? listing.verified : false } : listing);
   write(LISTINGS_KEY, next);
 };
 export const updateListing = (id: string, update: Partial<Listing>) => {
+  if (useApi) {
+    void apiRequest<{ listing: Listing }>(`/api/listings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(update),
+    }).catch((error) => console.error("Unable to update API listing", error));
+  }
   const next = listListings().map((listing) => listing.id === id ? { ...listing, ...update } : listing);
   write(LISTINGS_KEY, next);
 };

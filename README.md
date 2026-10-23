@@ -75,7 +75,7 @@ This MVP stores users, passwords, sessions, listings, requests, messages, review
 
 ## Backend Phase 4
 
-The backend now provides a PostgreSQL schema, secure bcrypt password hashing, HTTP-only session cookies, server-side suspension and role checks, approved listing discovery, authenticated service request creation/listing, request status transitions, appointment confirmation, ownership authorization, request messaging, completed-request reviews, per-user favorites, security headers, same-origin protection for state-changing requests, and in-memory request rate limits. The rate limiter is suitable for local development and a single instance; production deployments should move rate-limit state to shared infrastructure.
+The backend now provides a PostgreSQL schema, secure bcrypt password hashing, HTTP-only session cookies, server-side suspension and role checks, approved listing discovery, provider listing creation/editing/claiming, administrator listing moderation, authenticated service request creation/listing, request status transitions, appointment confirmation, ownership authorization, request messaging, completed-request reviews, per-user favorites, security headers, same-origin protection for state-changing requests, and in-memory request rate limits. The rate limiter is suitable for local development and a single instance; production deployments should move rate-limit state to shared infrastructure.
 
 To run it locally:
 
@@ -87,6 +87,6 @@ npm run db:migrate
 npm run dev
 ```
 
-The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. Notifications, reports, audit events, listing management, and full administrator workflows remain the next backend slices.
+The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. Notifications, reports, audit events, user administration, and full frontend synchronization remain the next backend slices.
 
 To enable the API-backed authentication path in the frontend, copy `.env.example` to `.env` in the project root and run the Vite app after starting the API. Without `VITE_API_URL`, the app intentionally continues using its local demo authentication.
