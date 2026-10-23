@@ -18,18 +18,16 @@ services:
         sync: false
       - key: WEB_ORIGIN
         fromService:
-          type: static_site
+          type: web
           name: gura-web
           envVarKey: RENDER_EXTERNAL_URL
 
-  - type: static_site
+  - type: web
     name: gura-web
+    runtime: node
+    plan: free
     buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    startCommand: node deploy-server.mjs
     envVars:
       - key: VITE_API_URL
         fromService:

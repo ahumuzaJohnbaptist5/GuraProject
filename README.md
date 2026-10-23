@@ -96,7 +96,7 @@ To enable the API-backed authentication path in the frontend, copy `.env.example
 The repository includes `render.yaml` for a Render Blueprint with two services:
 
 - `gura-api`: Node/Express API running from `server/`
-- `gura-web`: React/Vite static site with SPA route rewrites
+- `gura-web`: free Node web service serving the React/Vite build with SPA fallback
 
 To deploy:
 
@@ -106,4 +106,4 @@ To deploy:
 4. Apply the Blueprint. Render wires `VITE_API_URL` to the API public URL and `WEB_ORIGIN` to the frontend public URL.
 5. After deployment, verify `/health` on the API URL and open the frontend URL.
 
-Do not commit `.env` files or Supabase secret keys. The Blueprint intentionally marks `DATABASE_URL` as a secret input. Static-site environment variables are injected at build time, so redeploy the frontend after changing the API URL.
+Do not commit `.env` files or Supabase secret keys. The Blueprint intentionally marks `DATABASE_URL` as a secret input. Frontend environment variables are injected at build time, so redeploy the web service after changing the API URL.
