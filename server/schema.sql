@@ -95,6 +95,15 @@ CREATE TABLE IF NOT EXISTS audit_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS listings_owner_idx ON listings(owner_id);
 CREATE INDEX IF NOT EXISTS requests_customer_idx ON service_requests(customer_id);
@@ -103,6 +112,7 @@ CREATE INDEX IF NOT EXISTS messages_request_idx ON messages(request_id, created_
 CREATE INDEX IF NOT EXISTS reviews_listing_idx ON reviews(listing_id, created_at);
 CREATE INDEX IF NOT EXISTS listing_reports_status_idx ON listing_reports(status, created_at);
 CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, created_at);
 
 INSERT INTO listings (id, name, type, location, text, services, verified, rating, availability, moderation_status)
 VALUES

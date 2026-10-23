@@ -89,6 +89,10 @@ npm run dev
 
 The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. Notifications and complete frontend synchronization remain the next backend slices.
 
+### Email notifications
+
+Email delivery is optional. The API always stores notifications in PostgreSQL; when all SMTP variables are configured, it also sends email notifications for new requests, request status changes, appointment confirmations, and new messages. For Gmail, use an app password with SMTP host `smtp.gmail.com` and port `465`. Configure `SMTP_USER`, `SMTP_PASS`, and optionally `SMTP_FROM` in Render; never commit or paste the app password into source control.
+
 To enable the API-backed authentication path in the frontend, copy `.env.example` to `.env` in the project root and run the Vite app after starting the API. Without `VITE_API_URL`, the app intentionally continues using its local demo authentication.
 
 ## Deploy on Render free tier

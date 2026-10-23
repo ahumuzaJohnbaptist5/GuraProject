@@ -6,6 +6,7 @@ import { config } from "./config.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword, type AuthUser } from "./auth.js";
 import { query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
+import { createNotification } from "./notifications.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -41,6 +42,22 @@ const registerSchema = z.object({
 });
 
 app.get("/health", (_request, response) => response.json({ ok: true, service: "gura-api" }));
+
+app.get("/api/notifications", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  const result = await query(
+    `SELECT id, user_id AS "userId", title, body, read, created_at AS "createdAt"
+     FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+    [user.id],
+  );
+  response.json({ notifications: result.rows });
+}));
+
+app.patch("/api/notifications/read", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  await query("UPDATE notifications SET read = TRUE WHERE user_id = $1", [user.id]);
+  response.status(204).end();
+}));
 
 const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attempts. Please try again later.");
 
@@ -366,6 +383,9 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
     [user.id, listing.rows[0].owner_id, input.listingId, input.title, input.details, input.preferredDate || null, input.preferredTime || null],
   );
   response.status(201).json({ request: result.rows[0] });
+  if (listing.rows[0].owner_id) {
+    await createNotification(listing.rows[0].owner_id, "New service request", input.title);
+  }
 }));
 
 app.get("/api/requests", requireUser, asyncRoute(async (_request, response) => {
@@ -426,6 +446,9 @@ app.patch("/api/requests/:id/status", requireUser, asyncRoute(async (request, re
     [input.status, requestId],
   );
   response.json({ request: result.rows[0] });
+  if (input.status !== "cancelled" && item.customer_id !== user.id) {
+    await createNotification(item.customer_id, `Request ${input.status}`, result.rows[0].title);
+  }
 }));
 
 app.patch("/api/requests/:id/appointment", requireUser, asyncRoute(async (request, response) => {
@@ -452,6 +475,9 @@ app.patch("/api/requests/:id/appointment", requireUser, asyncRoute(async (reques
     [input.confirmedDate, input.confirmedTime || null, requestId],
   );
   response.json({ request: result.rows[0] });
+  if (item.customer_id !== user.id) {
+    await createNotification(item.customer_id, "Appointment confirmed", `${result.rows[0].title} · ${input.confirmedDate}${input.confirmedTime ? ` at ${input.confirmedTime}` : ""}`);
+  }
 }));
 
 const requestAccess = async (requestId: string, user: AuthUser) => {
@@ -487,6 +513,14 @@ app.post("/api/requests/:id/messages", requireUser, asyncRoute(async (request, r
     [requestId, user.id, input.body],
   );
   response.status(201).json({ message: result.rows[0] });
+  const participant = await query<{ customer_id: string; provider_id: string | null }>(
+    "SELECT customer_id, provider_id FROM service_requests WHERE id = $1",
+    [requestId],
+  );
+  const recipient = participant.rows[0] && participant.rows[0].customer_id === user.id
+    ? participant.rows[0].provider_id
+    : participant.rows[0]?.customer_id;
+  if (recipient) await createNotification(recipient, "New message", input.body);
 }));
 
 app.get("/api/listings/:id/reviews", asyncRoute(async (request, response) => {

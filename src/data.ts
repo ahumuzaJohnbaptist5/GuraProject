@@ -46,6 +46,12 @@ export const hydrateDomain = async () => {
     write(REQUESTS_KEY, []);
   }
   try {
+    const notifications = await apiRequest<{ notifications: Notification[] }>("/api/notifications");
+    write(NOTIFICATIONS_KEY, notifications.notifications);
+  } catch {
+    write(NOTIFICATIONS_KEY, []);
+  }
+  try {
     const reports = await apiRequest<{ reports: ListingReport[] }>("/api/admin/reports");
     write(REPORTS_KEY, reports.reports);
     const audit = await apiRequest<{ events: AuditEvent[] }>("/api/admin/audit");
@@ -195,6 +201,10 @@ export const createNotification = (notification: Notification) => {
   return notification;
 };
 export const markNotificationsRead = (userId: string) => {
+  if (useApi) {
+    void apiRequest(`/api/notifications/read`, { method: "PATCH", body: "{}" })
+      .catch((error) => console.error("Unable to mark API notifications read", error));
+  }
   const next = read<Notification[]>(NOTIFICATIONS_KEY, []).map((item) => item.userId === userId ? { ...item, read: true } : item);
   write(NOTIFICATIONS_KEY, next);
 };
