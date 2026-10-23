@@ -18,11 +18,11 @@ services:
         sync: false
       - key: WEB_ORIGIN
         fromService:
-          type: static
+          type: static_site
           name: gura-web
           envVarKey: RENDER_EXTERNAL_URL
 
-  - type: static
+  - type: static_site
     name: gura-web
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
