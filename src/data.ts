@@ -12,11 +12,14 @@ const DOMAIN_KEYS = [LISTINGS_KEY, REQUESTS_KEY, MESSAGES_KEY, REVIEWS_KEY, FAVO
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 const useApi = Boolean(API_URL);
 
-const seedListings: Listing[] = [
-  { id: "listing-maya", name: "Maya Tech Care", type: "technician", location: "Central district", text: "Laptop diagnostics, phone repairs, and patient explanations.", services: ["Laptop repair", "Phone repair", "Diagnostics"], verified: true, rating: 4.9, availability: "Weekdays · 09:00–17:00", moderationStatus: "approved" },
-  { id: "listing-circuit", name: "Circuit Corner", type: "shop", location: "Market street", text: "Accessories, refurbished devices, and everyday essentials.", services: ["Accessories", "Refurbished devices", "Trade-ins"], verified: true, rating: 4.7, availability: "Mon–Sat · 10:00–18:00", moderationStatus: "approved" },
-  { id: "listing-sam", name: "Sam's Smart Finds", type: "seller", location: "West side", text: "Carefully tested laptops and phones looking for a second life.", services: ["Used laptops", "Used phones", "Device testing"], verified: false, rating: 4.6, availability: "By appointment", moderationStatus: "approved" },
-];
+const legacyDemoListingIds = new Set([
+  "listing-maya",
+  "listing-circuit",
+  "listing-sam",
+  "00000000-0000-0000-0000-000000000001",
+  "00000000-0000-0000-0000-000000000002",
+  "00000000-0000-0000-0000-000000000003",
+]);
 
 const read = <T,>(key: string, fallback: T): T => {
   const raw = localStorage.getItem(key);
@@ -65,9 +68,9 @@ export const hydrateDomain = async () => {
 
 export const listListings = (): Listing[] => {
   const listings = read<Listing[]>(LISTINGS_KEY, []);
-  if (listings.length) return listings;
-  write(LISTINGS_KEY, seedListings);
-  return seedListings;
+  const userListings = listings.filter((listing) => !legacyDemoListingIds.has(listing.id));
+  if (userListings.length !== listings.length) write(LISTINGS_KEY, userListings);
+  return userListings;
 };
 export const listRequests = (): ServiceRequest[] => read<ServiceRequest[]>(REQUESTS_KEY, []);
 export const listMessages = (): Message[] => read<Message[]>(MESSAGES_KEY, []);

@@ -87,7 +87,7 @@ npm run db:migrate
 npm run dev
 ```
 
-The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. Notifications and complete frontend synchronization remain the next backend slices.
+The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. The directory has no built-in demo listings: it displays only listings created through the application (and approved listings returned by the API).
 
 ### Email notifications
 
