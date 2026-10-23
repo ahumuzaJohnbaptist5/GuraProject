@@ -14,7 +14,7 @@ app.use(cors({ origin: config.webOrigin, credentials: true }));
 app.use(securityHeaders);
 app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly."));
 app.use(sameOrigin);
-app.use(express.json({ limit: "64kb" }));
+app.use(express.json({ limit: "8mb" }));
 app.use(cookieParser());
 
 const asyncRoute = (handler: (request: Request, response: Response) => Promise<void>) =>
@@ -124,8 +124,9 @@ app.patch("/api/auth/me", requireUser, asyncRoute(async (request, response) => {
 
 app.get("/api/listings", asyncRoute(async (_request, response) => {
   const result = await query(
-    `SELECT id, owner_id AS "ownerId", name, type, location, text, services, verified,
-            rating, availability, moderation_status AS "moderationStatus"
+    `SELECT id, owner_id AS "ownerId", name, type, location, text, services,
+            image_urls AS "images", verified, rating, availability,
+            moderation_status AS "moderationStatus"
      FROM listings WHERE moderation_status = 'approved' ORDER BY rating DESC, created_at DESC`,
   );
   response.json({ listings: result.rows });
@@ -137,11 +138,14 @@ const listingInputSchema = z.object({
   location: z.string().trim().min(2).max(160),
   text: z.string().trim().min(3).max(4000),
   services: z.array(z.string().trim().min(1).max(80)).max(20),
+  imageUrls: z.array(
+    z.string().trim().max(1_500_000).refine((value) => value.startsWith("data:image/") || /^https?:\/\//.test(value), "Image must be a data URL or HTTPS URL."),
+  ).max(6).optional(),
   availability: z.string().trim().max(160).nullable().optional(),
 });
 
 const listingSelect = `id, owner_id AS "ownerId", name, type, location, text, services,
-  verified, rating, availability, moderation_status AS "moderationStatus"`;
+  image_urls AS "images", verified, rating, availability, moderation_status AS "moderationStatus"`;
 
 app.get("/api/admin/listings", requireUser, asyncRoute(async (_request, response) => {
   const user = response.locals.user as AuthUser;
@@ -166,10 +170,10 @@ app.post("/api/listings", requireUser, asyncRoute(async (request, response) => {
     return;
   }
   const result = await query(
-    `INSERT INTO listings (owner_id, name, type, location, text, services, availability)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO listings (owner_id, name, type, location, text, services, image_urls, availability)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING ${listingSelect}`,
-    [user.id, input.name, input.type, input.location, input.text, input.services, input.availability ?? null],
+    [user.id, input.name, input.type, input.location, input.text, input.services, input.imageUrls ?? [], input.availability ?? null],
   );
   response.status(201).json({ listing: result.rows[0] });
 }));
@@ -190,13 +194,14 @@ app.patch("/api/listings/:id", requireUser, asyncRoute(async (request, response)
   const result = await query(
     `UPDATE listings SET
       name = COALESCE($1, name), type = COALESCE($2, type), location = COALESCE($3, location),
-      text = COALESCE($4, text), services = COALESCE($5, services), availability = COALESCE($6, availability),
-      moderation_status = CASE WHEN $7 = 'administrator' THEN moderation_status ELSE 'pending' END,
-      verified = CASE WHEN $7 = 'administrator' THEN verified ELSE false END
-     WHERE id = $8
+      text = COALESCE($4, text), services = COALESCE($5, services),
+      image_urls = COALESCE($6, image_urls), availability = COALESCE($7, availability),
+      moderation_status = CASE WHEN $8 = 'administrator' THEN moderation_status ELSE 'pending' END,
+      verified = CASE WHEN $8 = 'administrator' THEN verified ELSE false END
+     WHERE id = $9
      RETURNING ${listingSelect}`,
     [input.name ?? null, input.type ?? null, input.location ?? null, input.text ?? null,
-      input.services ?? null, input.availability ?? null, user.role, listingId],
+      input.services ?? null, input.imageUrls ?? null, input.availability ?? null, user.role, listingId],
   );
   response.json({ listing: result.rows[0] });
 }));

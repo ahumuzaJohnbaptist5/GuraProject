@@ -32,6 +32,7 @@ export type Listing = {
   location: string;
   text: string;
   services: string[];
+  images?: string[];
   verified: boolean;
   rating: number;
   availability?: string;

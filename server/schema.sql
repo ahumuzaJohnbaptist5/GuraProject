@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS listings (
   location TEXT NOT NULL,
   text TEXT NOT NULL,
   services TEXT[] NOT NULL DEFAULT '{}',
+  image_urls TEXT[] NOT NULL DEFAULT '{}',
   verified BOOLEAN NOT NULL DEFAULT FALSE,
   rating NUMERIC(2,1) NOT NULL DEFAULT 0,
   availability TEXT,
@@ -113,6 +114,8 @@ CREATE INDEX IF NOT EXISTS reviews_listing_idx ON reviews(listing_id, created_at
 CREATE INDEX IF NOT EXISTS listing_reports_status_idx ON listing_reports(status, created_at);
 CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at);
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, created_at);
+
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS image_urls TEXT[] NOT NULL DEFAULT '{}';
 
 DELETE FROM listings
 WHERE id IN (

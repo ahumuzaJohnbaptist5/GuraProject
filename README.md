@@ -45,6 +45,7 @@ npm run preview
 - Provider appointment details in request conversations
 - Directory sorting by highest rated
 - Provider editing of listing availability
+- Provider listing media room for shop product photos and technician location proof
 - Dashboard metrics for requests and live listings
 - Request status filtering in dashboards
 - Listing reports with administrator resolve/dismiss actions
@@ -87,7 +88,7 @@ npm run db:migrate
 npm run dev
 ```
 
-The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. The directory has no built-in demo listings: it displays only listings created through the application (and approved listings returned by the API).
+The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE_API_URL` in the root `.env` to enable API-backed authentication and domain hydration; without it, localStorage mode remains available. The directory has no built-in demo listings: it displays only listings created through the application (and approved listings returned by the API). Provider images are currently stored as constrained image data URLs for the MVP; move them to Supabase Storage before accepting larger production galleries.
 
 ### Email notifications
 

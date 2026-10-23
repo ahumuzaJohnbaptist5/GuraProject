@@ -168,6 +168,7 @@ export const createListing = (listing: Listing) => {
         location: listing.location,
         text: listing.text,
         services: listing.services,
+        imageUrls: listing.images || [],
         availability: listing.availability || null,
       }),
     }).then(({ listing: created }) => {
@@ -190,9 +191,10 @@ export const updateListingStatus = (id: string, moderationStatus: Listing["moder
 };
 export const updateListing = (id: string, update: Partial<Listing>) => {
   if (useApi) {
+    const { images, ...rest } = update;
     void apiRequest<{ listing: Listing }>(`/api/listings/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(update),
+      body: JSON.stringify({ ...rest, ...(images ? { imageUrls: images } : {}) }),
     }).catch((error) => console.error("Unable to update API listing", error));
   }
   const next = listListings().map((listing) => listing.id === id ? { ...listing, ...update } : listing);
