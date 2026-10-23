@@ -223,6 +223,124 @@ app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (r
   response.json({ listing: result.rows[0] });
 }));
 
+app.post("/api/reports", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  const input = z.object({
+    id: z.string().uuid().optional(),
+    listingId: z.string().uuid(),
+    reason: z.string().trim().min(2).max(120),
+    details: z.string().trim().min(2).max(2000),
+  }).parse(request.body);
+  const result = await query(
+    `INSERT INTO listing_reports (id, listing_id, reporter_id, reason, details)
+     VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
+     RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+       created_at AS "createdAt"`,
+    [input.id ?? null, input.listingId, user.id, input.reason, input.details],
+  );
+  response.status(201).json({ report: result.rows[0] });
+}));
+
+app.get("/api/admin/reports", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const result = await query(
+    `SELECT id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+      created_at AS "createdAt" FROM listing_reports ORDER BY created_at DESC`,
+  );
+  response.json({ reports: result.rows });
+}));
+
+app.patch("/api/admin/reports/:id", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const input = z.object({ status: z.enum(["open", "resolved", "dismissed"]) }).parse(request.body);
+  const result = await query(
+    `UPDATE listing_reports SET status = $1 WHERE id = $2
+     RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+       created_at AS "createdAt"`,
+    [input.status, String(request.params.id)],
+  );
+  if (!result.rows[0]) {
+    response.status(404).json({ error: "Report not found." });
+    return;
+  }
+  response.json({ report: result.rows[0] });
+}));
+
+app.get("/api/admin/users", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const result = await query(
+    `SELECT id, name, email, role, location, bio, verified, suspended
+     FROM users ORDER BY created_at DESC`,
+  );
+  response.json({ users: result.rows });
+}));
+
+app.patch("/api/admin/users/:id", requireUser, asyncRoute(async (request, response) => {
+  const actor = response.locals.user as AuthUser;
+  if (actor.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const input = z.object({ verified: z.boolean().optional(), suspended: z.boolean().optional() }).refine((value) => value.verified !== undefined || value.suspended !== undefined).parse(request.body);
+  const result = await query<AuthUser>(
+    `UPDATE users SET verified = COALESCE($1, verified), suspended = COALESCE($2, suspended)
+     WHERE id = $3
+     RETURNING id, name, email, role, location, bio, verified, suspended`,
+    [input.verified ?? null, input.suspended ?? null, String(request.params.id)],
+  );
+  if (!result.rows[0]) {
+    response.status(404).json({ error: "User not found." });
+    return;
+  }
+  response.json({ user: result.rows[0] });
+}));
+
+app.get("/api/admin/audit", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const result = await query(
+    `SELECT id, actor_id AS "actorId", action, target, details, created_at AS "createdAt"
+     FROM audit_events ORDER BY created_at DESC LIMIT 200`,
+  );
+  response.json({ events: result.rows });
+}));
+
+app.post("/api/admin/audit", requireUser, asyncRoute(async (request, response) => {
+  const actor = response.locals.user as AuthUser;
+  if (actor.role !== "administrator") {
+    response.status(403).json({ error: "Administrator access required." });
+    return;
+  }
+  const input = z.object({
+    id: z.string().uuid().optional(),
+    action: z.string().trim().min(2).max(160),
+    target: z.string().trim().min(1).max(160),
+    details: z.string().trim().max(2000),
+  }).parse(request.body);
+  const result = await query(
+    `INSERT INTO audit_events (id, actor_id, action, target, details)
+     VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
+     RETURNING id, actor_id AS "actorId", action, target, details, created_at AS "createdAt"`,
+    [input.id ?? null, actor.id, input.action, input.target, input.details],
+  );
+  response.status(201).json({ event: result.rows[0] });
+}));
+
 app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
   const user = response.locals.user as AuthUser;
   const input = z.object({

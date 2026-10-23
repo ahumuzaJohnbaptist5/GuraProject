@@ -45,6 +45,16 @@ export const hydrateDomain = async () => {
   } catch {
     write(REQUESTS_KEY, []);
   }
+  try {
+    const reports = await apiRequest<{ reports: ListingReport[] }>("/api/admin/reports");
+    write(REPORTS_KEY, reports.reports);
+    const audit = await apiRequest<{ events: AuditEvent[] }>("/api/admin/audit");
+    write(AUDIT_KEY, audit.events);
+    const users = await apiRequest<{ users: User[] }>("/api/admin/users");
+    write("gura-users", users.users);
+  } catch {
+    // Non-administrators are expected to receive 403 for admin hydration.
+  }
 };
 
 export const listListings = (): Listing[] => {
@@ -67,6 +77,10 @@ export const listReports = (): ListingReport[] => read<ListingReport[]>(REPORTS_
 export const listUsers = (): User[] => read<Array<User & { password: string }>>("gura-users", []).map(({ password: _password, ...user }) => user);
 export const listAuditEvents = (): AuditEvent[] => read<AuditEvent[]>(AUDIT_KEY, []);
 export const createAuditEvent = (event: AuditEvent) => {
+  if (useApi) {
+    void apiRequest<{ event: AuditEvent }>("/api/admin/audit", { method: "POST", body: JSON.stringify(event) })
+      .catch((error) => console.error("Unable to create API audit event", error));
+  }
   const next = [event, ...listAuditEvents()];
   write(AUDIT_KEY, next);
   return event;
@@ -185,11 +199,19 @@ export const markNotificationsRead = (userId: string) => {
   write(NOTIFICATIONS_KEY, next);
 };
 export const createReport = (report: ListingReport) => {
+  if (useApi) {
+    void apiRequest<{ report: ListingReport }>("/api/reports", { method: "POST", body: JSON.stringify(report) })
+      .catch((error) => console.error("Unable to create API report", error));
+  }
   const next = [report, ...listReports()];
   write(REPORTS_KEY, next);
   return report;
 };
 export const updateReportStatus = (id: string, status: ListingReport["status"]) => {
+  if (useApi) {
+    void apiRequest<{ report: ListingReport }>(`/api/admin/reports/${id}`, { method: "PATCH", body: JSON.stringify({ status }) })
+      .catch((error) => console.error("Unable to update API report", error));
+  }
   write(REPORTS_KEY, listReports().map((report) => report.id === id ? { ...report, status } : report));
 };
 
@@ -244,6 +266,10 @@ export const domainAdapter: DomainAdapter = {
   createReport,
   updateReportStatus,
   updateUser(userId, update) {
+    if (useApi) {
+      void apiRequest<{ user: User }>(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(update) })
+        .catch((error) => console.error("Unable to update API user", error));
+    }
     const raw = localStorage.getItem("gura-users");
     if (!raw) return;
     const users = JSON.parse(raw) as Array<User & { password: string }>;
