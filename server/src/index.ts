@@ -5,10 +5,14 @@ import { z } from "zod";
 import { config } from "./config.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword, type AuthUser } from "./auth.js";
 import { query } from "./db.js";
+import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
 
 const app = express();
 app.use(cors({ origin: config.webOrigin, credentials: true }));
-app.use(express.json({ limit: "1mb" }));
+app.use(securityHeaders);
+app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly."));
+app.use(sameOrigin);
+app.use(express.json({ limit: "64kb" }));
 app.use(cookieParser());
 
 const asyncRoute = (handler: (request: Request, response: Response) => Promise<void>) =>
@@ -37,7 +41,9 @@ const registerSchema = z.object({
 
 app.get("/health", (_request, response) => response.json({ ok: true, service: "gura-api" }));
 
-app.post("/api/auth/register", asyncRoute(async (request, response) => {
+const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attempts. Please try again later.");
+
+app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, response) => {
   const input = registerSchema.parse(request.body);
   const passwordHash = await hashPassword(input.password);
   const result = await query<AuthUser>(
@@ -51,7 +57,7 @@ app.post("/api/auth/register", asyncRoute(async (request, response) => {
   response.status(201).json({ user });
 }));
 
-app.post("/api/auth/login", asyncRoute(async (request, response) => {
+app.post("/api/auth/login", authRateLimit, asyncRoute(async (request, response) => {
   const input = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(request.body);
   const result = await query<AuthUser & { password_hash: string }>(
     `SELECT id, name, email, role, location, bio, verified, suspended, password_hash

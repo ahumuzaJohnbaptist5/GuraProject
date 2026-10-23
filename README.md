@@ -75,7 +75,7 @@ This MVP stores users, passwords, sessions, listings, requests, messages, review
 
 ## Backend Phase 4
 
-The backend now provides a PostgreSQL schema, secure bcrypt password hashing, HTTP-only session cookies, server-side suspension and role checks, approved listing discovery, authenticated service request creation/listing, request status transitions, appointment confirmation, ownership authorization, request messaging, completed-request reviews, and per-user favorites.
+The backend now provides a PostgreSQL schema, secure bcrypt password hashing, HTTP-only session cookies, server-side suspension and role checks, approved listing discovery, authenticated service request creation/listing, request status transitions, appointment confirmation, ownership authorization, request messaging, completed-request reviews, per-user favorites, security headers, same-origin protection for state-changing requests, and in-memory request rate limits. The rate limiter is suitable for local development and a single instance; production deployments should move rate-limit state to shared infrastructure.
 
 To run it locally:
 
