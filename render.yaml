@@ -18,10 +18,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: WEB_ORIGIN
-        fromService:
-          type: web
-          name: gura-web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://gura-web-bkid.onrender.com
 
   - type: web
     name: gura-web
@@ -31,7 +28,4 @@ services:
     startCommand: node deploy-server.mjs
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: gura-api
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://gura-api-272p.onrender.com
