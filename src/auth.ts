@@ -4,8 +4,8 @@ const USERS_KEY = "gura-users";
 const SESSION_KEY = "gura-session";
 
 type StoredUser = User & { password: string };
-const API_URL = import.meta.env.VITE_API_URL as string | undefined;
-const useApi = Boolean(API_URL);
+const API_URL = import.meta.env.PROD ? "" : (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "");
+const useApi = import.meta.env.PROD || Boolean(API_URL);
 
 const readUsers = (): StoredUser[] => {
   const raw = localStorage.getItem(USERS_KEY);

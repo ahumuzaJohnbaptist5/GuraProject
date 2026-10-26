@@ -9,8 +9,8 @@ const NOTIFICATIONS_KEY = "gura-notifications";
 const REPORTS_KEY = "gura-reports";
 const AUDIT_KEY = "gura-audit";
 const DOMAIN_KEYS = [LISTINGS_KEY, REQUESTS_KEY, MESSAGES_KEY, REVIEWS_KEY, FAVORITES_KEY, NOTIFICATIONS_KEY, REPORTS_KEY, AUDIT_KEY];
-const API_URL = import.meta.env.VITE_API_URL as string | undefined;
-const useApi = Boolean(API_URL);
+const API_URL = import.meta.env.PROD ? "" : (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "");
+const useApi = import.meta.env.PROD || Boolean(API_URL);
 
 const legacyDemoListingIds = new Set([
   "listing-maya",

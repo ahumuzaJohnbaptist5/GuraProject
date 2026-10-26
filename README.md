@@ -112,3 +112,23 @@ To deploy:
 5. After deployment, verify `/health` on the API URL and open the frontend URL.
 
 Do not commit `.env` files or Supabase secret keys. The Blueprint intentionally marks `DATABASE_URL` as a secret input. Frontend environment variables are injected at build time, so redeploy the web service after changing the API URL.
+
+## Authentication deployment repair
+
+Production builds always send `/api/*` requests to the web service. The web
+server proxies these to `API_URL` (default: `https://gura-api-272p.onrender.com`),
+forwarding cookies, Set-Cookie headers, request bodies, and Origin. This keeps
+sessions first-party without disabling CSRF protection or relying on third-party
+cookies. Local Vite development can still use `VITE_API_URL`.
+
+Redeploy **both** `gura-api` and `gura-web` after merging this fix. On an existing
+Render API service set `WEB_ORIGIN=https://gura-web-bkid.onrender.com` and use
+`npm run db:migrate && npm start` as the start command. Free services do not
+support a pre-deploy command, so the Blueprint now runs the idempotent schema
+setup at startup. Keep the existing `DATABASE_URL` secret. For other frontend
+hosts, WEB_ORIGIN accepts a comma-separated list of full origins.
+
+Check `/health` on the API, then register, sign out, sign in, and save a profile
+on the web service. A 502 JSON response from the web service means the API is
+unreachable; inspect API startup/database logs. A successful health response
+only confirms the process is running, not database readiness.

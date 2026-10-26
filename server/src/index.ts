@@ -10,7 +10,7 @@ import { createNotification } from "./notifications.js";
 
 const app = express();
 app.set("trust proxy", 1);
-app.use(cors({ origin: config.webOrigin, credentials: true }));
+app.use(cors({ origin: config.webOrigins, credentials: true }));
 app.use(securityHeaders);
 app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly."));
 app.use(sameOrigin);
@@ -76,7 +76,7 @@ app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, respons
 }));
 
 app.post("/api/auth/login", authRateLimit, asyncRoute(async (request, response) => {
-  const input = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(request.body);
+  const input = z.object({ email: z.string().trim().email(), password: z.string().min(1) }).parse(request.body);
   const result = await query<AuthUser & { password_hash: string }>(
     `SELECT id, name, email, role, location, bio, verified, suspended, password_hash
      FROM users WHERE email = lower($1)`,
@@ -599,6 +599,10 @@ app.put("/api/favorites/:listingId", requireUser, asyncRoute(async (request, res
 app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
   if (error instanceof z.ZodError) {
     response.status(400).json({ error: "Validation failed.", issues: error.issues });
+    return;
+  }
+  if ((error as { code?: string })?.code === "23505") {
+    response.status(409).json({ error: "An account with this email already exists." });
     return;
   }
   console.error(error);

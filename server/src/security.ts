@@ -55,7 +55,7 @@ export const sameOrigin = (request: Request, response: Response, next: NextFunct
     return;
   }
   const origin = request.get("origin");
-  if (origin && origin !== config.webOrigin) {
+  if (origin && !config.webOrigins.includes(origin)) {
     response.status(403).json({ error: "Cross-origin request rejected." });
     return;
   }

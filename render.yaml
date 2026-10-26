@@ -5,8 +5,7 @@ services:
     plan: free
     rootDir: server
     buildCommand: npm ci --include=dev && npm run build
-    preDeployCommand: npm run db:migrate
-    startCommand: npm start
+    startCommand: npm run db:migrate && npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -27,5 +26,5 @@ services:
     buildCommand: npm ci --include=dev && npm run build
     startCommand: node deploy-server.mjs
     envVars:
-      - key: VITE_API_URL
+      - key: API_URL
         value: https://gura-api-272p.onrender.com

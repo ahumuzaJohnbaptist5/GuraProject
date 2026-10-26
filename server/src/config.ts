@@ -6,10 +6,19 @@ const required = (name: string, fallback?: string) => {
   return value;
 };
 
+const webOrigins = (process.env.WEB_ORIGIN || (process.env.NODE_ENV === "production"
+  ? "https://gura-web-bkid.onrender.com" : "http://127.0.0.1:5173"))
+  .split(",").map((origin) => new URL(origin.trim()).origin);
+// Existing Render services may still have the original localhost WEB_ORIGIN.
+if (process.env.NODE_ENV === "production" && !webOrigins.includes("https://gura-web-bkid.onrender.com")) {
+  webOrigins.push("https://gura-web-bkid.onrender.com");
+}
+
 export const config = {
   port: Number(process.env.PORT || 8787),
   databaseUrl: required("DATABASE_URL"),
-  webOrigin: required("WEB_ORIGIN", "http://127.0.0.1:5173"),
+  webOrigin: webOrigins[0],
+  webOrigins,
   sessionDays: Number(process.env.SESSION_DAYS || 7),
   production: process.env.NODE_ENV === "production",
   email: {
