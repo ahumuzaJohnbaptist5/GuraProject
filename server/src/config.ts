@@ -6,10 +6,15 @@ const required = (name: string, fallback?: string) => {
   return value;
 };
 
+const normalizeOrigin = (value: string) => {
+  const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  return withProtocol.replace(/\/+$/, "");
+};
+
 export const config = {
   port: Number(process.env.PORT || 8787),
   databaseUrl: required("DATABASE_URL"),
-  webOrigin: required("WEB_ORIGIN", "http://127.0.0.1:5173"),
+  webOrigin: normalizeOrigin(required("WEB_ORIGIN", "http://127.0.0.1:5173")),
   sessionDays: Number(process.env.SESSION_DAYS || 7),
   production: process.env.NODE_ENV === "production",
   email: {
