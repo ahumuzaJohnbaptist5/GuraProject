@@ -11,6 +11,32 @@ const mailer = config.email.user && config.email.password
     })
   : null;
 
+const sendWithResend = async (to: string, subject: string, text: string) => {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.email.resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: config.email.resendFrom, to: [to], subject, text }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Resend returned ${response.status}: ${detail.slice(0, 300)}`);
+  }
+};
+
+const sendEmail = async (to: string, subject: string, text: string) => {
+  if (config.email.resendApiKey && config.email.resendFrom) {
+    await sendWithResend(to, subject, text);
+    return;
+  }
+  if (mailer) {
+    await mailer.sendMail({ from: config.email.from, to, subject, text });
+  }
+};
+
 export const createNotification = async (userId: string, title: string, body: string) => {
   const result = await query<{ id: string; email: string }>(
     `WITH inserted AS (
@@ -23,14 +49,9 @@ export const createNotification = async (userId: string, title: string, body: st
     [userId, title, body],
   );
   const notification = result.rows[0];
-  if (mailer && notification) {
+  if (notification && ((config.email.resendApiKey && config.email.resendFrom) || mailer)) {
     try {
-      await mailer.sendMail({
-        from: config.email.from,
-        to: notification.email,
-        subject: `Gura: ${title}`,
-        text: body,
-      });
+      await sendEmail(notification.email, `Gura: ${title}`, body);
     } catch (error) {
       console.error("Unable to send notification email", error);
     }

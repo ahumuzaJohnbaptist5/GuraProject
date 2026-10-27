@@ -92,7 +92,7 @@ The PostgreSQL database in `DATABASE_URL` must exist before migration. Set `VITE
 
 ### Email notifications
 
-Email delivery is optional. The API always stores notifications in PostgreSQL; when all SMTP variables are configured, it also sends email notifications for new requests, request status changes, appointment confirmations, and new messages. For Gmail, use an app password with SMTP host `smtp.gmail.com` and port `465`. Configure `SMTP_USER`, `SMTP_PASS`, and optionally `SMTP_FROM` in Render; never commit or paste the app password into source control.
+Email delivery is optional. The API always stores notifications in PostgreSQL. For Render, use an HTTP email provider such as Resend because free Render services may block outbound SMTP connections. Create a Resend API key, verify a sending domain or address, then set `RESEND_API_KEY` and `RESEND_FROM` in the `gura-api` service. The API sends through Resend first when those variables are present, and falls back to SMTP for local development. Gmail SMTP variables (`SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM`) remain supported locally, but never commit or paste credentials into source control.
 
 To enable the API-backed authentication path in the frontend, copy `.env.example` to `.env` in the project root and run the Vite app after starting the API. Without `VITE_API_URL`, the app intentionally continues using its local demo authentication.
 

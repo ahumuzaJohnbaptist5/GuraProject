@@ -19,6 +19,10 @@ services:
         sync: false
       - key: WEB_ORIGIN
         value: https://gura-web-bkid.onrender.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
 
   - type: web
     name: gura-web

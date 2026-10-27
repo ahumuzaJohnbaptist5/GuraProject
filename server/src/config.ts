@@ -13,6 +13,8 @@ export const config = {
   sessionDays: Number(process.env.SESSION_DAYS || 7),
   production: process.env.NODE_ENV === "production",
   email: {
+    resendApiKey: process.env.RESEND_API_KEY || "",
+    resendFrom: process.env.RESEND_FROM || "",
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: Number(process.env.SMTP_PORT || 465),
     user: process.env.SMTP_USER || "",
