@@ -6,6 +6,13 @@ const SESSION_KEY = "gura-session";
 type StoredUser = User & { password: string };
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 const useApi = Boolean(API_URL);
+const allowLocalDemo = import.meta.env.DEV && !useApi;
+
+const requireConfiguredAuth = () => {
+  if (!useApi && !allowLocalDemo) {
+    throw new Error("GURA authentication is not configured. Please contact the administrator.");
+  }
+};
 
 const readUsers = (): StoredUser[] => {
   const raw = localStorage.getItem(USERS_KEY);
@@ -30,6 +37,7 @@ const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 
 const localAuthAdapter: AuthAdapter = {
   async register(user, password) {
+    requireConfiguredAuth();
     if (useApi) {
       const result = await apiRequest<{ user: User }>("/api/auth/register", {
         method: "POST",
@@ -48,6 +56,7 @@ const localAuthAdapter: AuthAdapter = {
     return user;
   },
   async login({ email, password }: Credentials) {
+    requireConfiguredAuth();
     if (useApi) {
       const result = await apiRequest<{ user: User }>("/api/auth/login", {
         method: "POST",
@@ -66,6 +75,10 @@ const localAuthAdapter: AuthAdapter = {
     return user;
   },
   async logout() {
+    if (!useApi && !allowLocalDemo) {
+      saveSessionUser(null);
+      return;
+    }
     if (useApi) {
       await apiRequest("/api/auth/logout", { method: "POST" });
       saveSessionUser(null);
@@ -74,10 +87,12 @@ const localAuthAdapter: AuthAdapter = {
     localStorage.removeItem(SESSION_KEY);
   },
   getCurrentUser() {
+    if (!useApi && !allowLocalDemo) return null;
     const raw = localStorage.getItem(SESSION_KEY);
     return raw ? (JSON.parse(raw) as User) : null;
   },
   async saveProfile(profile) {
+    requireConfiguredAuth();
     const current = localAuthAdapter.getCurrentUser();
     if (!current) throw new Error("You must be signed in.");
     if (useApi) {
