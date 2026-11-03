@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download, Heart, Image as ImageIcon, LogOut, Menu, MessageCircle, RotateCcw, Search, ShieldCheck, Star, Store, Trash2, Upload, Wrench, X, MapPin, HardDrive, Cpu, Monitor, Eye, EyeOff, LockKeyhole, LoaderCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download, Heart, Image as ImageIcon, LogOut, Menu, MessageCircle, RotateCcw, Search, ShieldCheck, Star, Store, Trash2, Upload, Wrench, X, MapPin, HardDrive, Cpu, Monitor, Plug, Eye, EyeOff, LockKeyhole, LoaderCircle } from "lucide-react";
 import auth from "./auth";
 import { confirmRequestDate, createAuditEvent, createListing, createMessage, createReport, createRequest, createReview, domainAdapter, exportDomainData, getListingRating, hydrateDomain, listAuditEvents, listFavorites, listListings, listMessages, listNotifications, listReports, listRequests, listReviews, markNotificationsRead, resetDomainData, toggleFavorite, updateListing, updateListingStatus, updateReportStatus, updateRequest } from "./data";
 import type { Listing, ListingType, Role, ServiceRequest, User } from "./types";
@@ -11,52 +11,68 @@ const listingLabels: Record<ListingType, string> = { technician: "Technician", s
 function Header({ user, onLogout }: { user: User | null; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const unread = user ? listNotifications(user.id).filter((item) => !item.read).length : 0;
-  return <header className="site-header"><Link className="brand" to="/" aria-label="Gura home"><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></Link><button className="menu-button" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button><nav className={open ? "nav open" : "nav"}><Link to="/directory" onClick={() => setOpen(false)}>Marketplace</Link>{user ? <><Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard{unread > 0 && <span className="notification-badge">{unread}</span>}</Link><button className="nav-logout" onClick={onLogout}><LogOut size={16} /> Sign out</button></> : <><Link to="/login" onClick={() => setOpen(false)}>Sign in</Link><Link className="button small" to="/register" onClick={() => setOpen(false)}>Get started</Link></>}</nav></header>;
+  return <header className="site-header"><Link className="brand" to="/" aria-label="Gura home"><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></Link><button className="menu-button" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button><nav className={open ? "nav open" : "nav"}><Link to="/directory" onClick={() => setOpen(false)}>Marketplace</Link><Link to="/#urgent-requests" onClick={() => setOpen(false)}>Urgent Requests</Link><Link to="/directory?type=shop" onClick={() => setOpen(false)}>Suppliers</Link>{user ? <><Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard{unread > 0 && <span className="notification-badge">{unread}</span>}</Link><button className="nav-logout" onClick={onLogout}><LogOut size={16} /> Sign out</button></> : <><Link to="/login" onClick={() => setOpen(false)}>Sign in</Link><Link className="button small" to="/register" onClick={() => setOpen(false)}>Get started</Link></>}</nav></header>;
 }
 function Layout({ children, user, onLogout }: { children: React.ReactNode; user: User | null; onLogout: () => void }) { return <div className="app-shell"><Header user={user} onLogout={onLogout} />{children}<footer><div className="footer-inner"><strong><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></strong><span>Trusted electronics, made simple.</span><span>GURA regional marketplace</span></div></footer></div>; }
 function FreshHome() {
   const navigate = useNavigate();
   const [part, setPart] = useState("");
-  const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
-  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+  const categories = [
+    { title: "Displays & Panels", detail: "Laptop screens and monitors", keyword: "display", icon: <Monitor size={26}/> },
+    { title: "RAM & Memory", detail: "DDR3, DDR4 and DDR5", keyword: "RAM", icon: <Cpu size={26}/> },
+    { title: "Storage Drives", detail: "SSDs and hard drives", keyword: "SSD", icon: <HardDrive size={26}/> },
+    { title: "Power & Cables", detail: "Chargers and adapters", keyword: "power", icon: <Plug size={26}/> },
+  ];
+  const samples = [
+    { name: '14.0" FHD IPS Slim LED Screen (30-Pin)', compatibility: "Fits: HP, Lenovo, Dell", price: "UGX 180,000", condition: "NEW", kind: "screen", icon: <Monitor size={35}/> },
+    { name: "8GB DDR4 3200MHz Laptop RAM SODIMM", compatibility: "Universal DDR4", price: "UGX 85,000", condition: "REFURBISHED", kind: "ram", icon: <Cpu size={35}/> },
+    { name: "512GB NVMe M.2 PCIe Gen3 SSD", compatibility: "Fits: ThinkPad, Latitude", price: "UGX 145,000", condition: "NEW", kind: "ssd", icon: <HardDrive size={35}/> },
+  ];
+  const search = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const params = new URLSearchParams();
-    const search = [part.trim(), category].filter(Boolean).join(" ");
-    if (search) params.set("q", search);
+    if (part.trim()) params.set("q", part.trim());
     if (location) params.set("location", location);
-    navigate(`/directory${params.toString() ? `?${params.toString()}` : ""}`);
+    navigate(`/directory${params.toString() ? "?" + params.toString() : ""}`);
   };
-  return <main className="marketplace-home">
-    <section className="marketplace-hero">
-      <div className="container marketplace-hero-inner">
-        <div className="marketplace-intro">
-          <div className="marketplace-kicker"><span className="marketplace-kicker-dot" /> Local computer parts access network</div>
-          <h1>Find the right computer part, <span>closer to you.</span></h1>
-          <p>GURA connects technicians, repair shops and suppliers across your region. Discover nearby businesses, ask about stock and get connected faster.</p>
-          <form className="marketplace-search" onSubmit={submitSearch} role="search">
-            <label className="marketplace-search-input"><Search size={20}/><span className="sr-only">Search for a computer part</span><input value={part} onChange={e => setPart(e.target.value)} placeholder="Search parts, e.g. Lenovo keyboard" aria-label="Search parts or suppliers"/></label>
-            <label className="marketplace-select"><span className="sr-only">Part category</span><select aria-label="Part category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option><option value="RAM">RAM</option><option value="SSD">Storage</option><option value="display">Displays</option><option value="keyboard">Keyboards</option><option value="battery">Batteries</option><option value="charger">Chargers</option></select></label>
-            <label className="marketplace-select"><MapPin size={17}/><span className="sr-only">Location</span><select aria-label="Location" value={location} onChange={e => setLocation(e.target.value)}><option value="">All locations</option><option value="Kabale">Kabale</option><option value="Mbarara">Mbarara</option><option value="Kampala">Kampala</option><option value="Fort Portal">Fort Portal</option><option value="Ntungamo">Ntungamo</option></select></label>
-            <button type="submit" className="button marketplace-search-button"><Search size={18}/> Search network</button>
-          </form>
-          <p className="marketplace-search-note"><ShieldCheck size={15}/> Search currently matches existing supplier and service listings. A dedicated priced parts catalogue is planned for Phase 1.</p>
-          <div className="marketplace-hero-actions"><Link to="/directory" className="marketplace-outline-link"><Store size={18}/> Browse local suppliers <ArrowRight size={16}/></Link><Link to="/register" className="marketplace-outline-link"><ClipboardList size={18}/> Join the network <ArrowRight size={16}/></Link></div>
-        </div>
-        <div className="marketplace-showcase" aria-hidden="true">
-          <div className="marketplace-showcase-top"><span><span className="marketplace-live-dot"/> GURA Marketplace</span><span className="marketplace-showcase-label">Regional access</span></div>
-          <div className="marketplace-showcase-title">Your local parts network</div>
-          <div className="marketplace-category-preview"><span><HardDrive size={24}/><b>Storage</b></span><span><Cpu size={24}/><b>Memory</b></span><span><Monitor size={24}/><b>Displays</b></span></div>
-          <div className="marketplace-showcase-footer"><ShieldCheck size={18}/><span>Connect with businesses near you</span></div>
-        </div>
+  return <main className="gura-landing">
+    <section className="container gura-landing-hero">
+      <span className="gura-landing-kicker"><span aria-hidden="true"/> Regional Computer Parts &amp; Hardware Network</span>
+      <h1>Find the right computer part, <em>closer to you.</em></h1>
+      <p>Connect directly with local repair shops, suppliers, and technicians in your area. Explore the network, inquire about available components, and reduce sourcing time.</p>
+      <form className="gura-landing-search" role="search" onSubmit={search}>
+        <label className="gura-landing-query"><Search size={20}/><span className="sr-only">Computer parts or suppliers</span><input aria-label="Computer parts or suppliers" placeholder="Search replacement screens, RAM, storage, power adapters..." value={part} onChange={e=>setPart(e.target.value)}/></label>
+        <label className="gura-landing-location"><MapPin size={17}/><span className="sr-only">Location</span><select aria-label="Location" value={location} onChange={e=>setLocation(e.target.value)}><option value="">All Locations</option><option value="Kabale">Kabale</option><option value="Mbarara">Mbarara</option><option value="Kampala">Kampala</option><option value="Fort Portal">Fort Portal</option><option value="Ntungamo">Ntungamo</option></select></label>
+        <button className="button" type="submit">Search Network <ArrowRight size={17}/></button>
+      </form>
+      <p className="gura-landing-disclaimer">Search currently discovers supplier and service profiles. Live parts inventory and stock search are in development.</p>
+    </section>
+    <section className="container gura-landing-section">
+      <div className="gura-landing-section-title"><h2>Popular Hardware Categories</h2><p>Browse the local network by component type</p></div>
+      <div className="gura-landing-categories">
+        {categories.map(category=><Link to={`/directory?q=${encodeURIComponent(category.keyword)}`} className="gura-category-tile" key={category.title}><span className="gura-category-icon">{category.icon}</span><strong>{category.title}</strong><small>{category.detail}</small><ArrowRight className="gura-category-arrow" size={16}/></Link>)}
       </div>
     </section>
-    <section className="marketplace-benefits container" aria-label="Marketplace benefits">
-      <article><span className="marketplace-benefit-icon"><Search size={21}/></span><div><h3>Discover local stockists</h3><p>Search by parts and location to find relevant local businesses.</p></div></article>
-      <article><span className="marketplace-benefit-icon"><ClipboardList size={21}/></span><div><h3>Request what you need</h3><p>Contact a provider and explain the part or repair you need.</p></div></article>
-      <article><span className="marketplace-benefit-icon"><ShieldCheck size={21}/></span><div><h3>Choose with confidence</h3><p>Review business profiles and displayed verification status.</p></div></article>
+    <section className="container gura-landing-section">
+      <div className="gura-landing-section-title"><div><h2>Verified Nearby Inventory</h2><p>See the kind of hardware listing GURA is being built to support</p></div><span className="gura-preview-label">Illustrative examples — not live stock</span></div>
+      <div className="gura-landing-products">
+        {samples.map(sample=><article className="gura-part-card" key={sample.name}>
+          <div className="gura-part-visual">{sample.icon}<span>Example listing</span></div>
+          <div className="gura-part-details"><span className={sample.condition==="NEW"?"gura-condition new":"gura-condition refurbished"}>{sample.condition}</span><h3>{sample.name}</h3><span className="gura-compatibility">{sample.compatibility}</span><strong className="gura-part-price">{sample.price}</strong></div>
+          <div className="gura-part-footer"><span><ShieldCheck size={15}/> Supplier details pending</span><span>Demo only</span></div>
+        </article>)}
+      </div>
+      <p className="gura-example-note">The sample names and prices above are taken from the supplied design reference for layout demonstration. They are not offers, verified sellers, or confirmed stock quantities.</p>
     </section>
-    <section className="marketplace-next"><div className="container marketplace-next-inner"><div><p className="eyebrow">For technicians, shops and suppliers</p><h2>Make your business easier to discover.</h2><p>Create a profile, share what you offer and connect with nearby buyers.</p></div><Link to="/register" className="button">Create your profile <ArrowRight size={18}/></Link></div></section>
+    <section className="container gura-urgent-banner" id="urgent-requests">
+      <div><h2>Can't find the specific part you need?</h2><p>GURA is developing urgent parts requests so local suppliers can respond while customer contact details remain protected.</p></div><Link className="button" to="/directory">Contact a Supplier <ArrowRight size={17}/></Link>
+    </section>
+    <section className="container gura-landing-trust">
+      <div><ShieldCheck size={25}/><span><strong>Supplier Verification</strong><small>Business identity review is part of the platform's trust roadmap.</small></span></div>
+      <div><LockKeyhole size={25}/><span><strong>Private Inquiries</strong><small>Share details with appropriate access controls, not in public listings.</small></span></div>
+      <div><ClipboardList size={25}/><span><strong>Order Audit Trails</strong><small>Traceable parts order records are planned for the marketplace.</small></span></div>
+    </section>
   </main>;
 }
 function FreshFeature({ icon, number, title, text }: { icon: React.ReactNode; number: string; title: string; text: string }) {
@@ -67,7 +83,7 @@ function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; 
 
 function Directory({ user }: { user: User | null }) {
   const [searchParams] = useSearchParams();
-  const [query, setQuery] = useState(() => searchParams.get("q") || ""); const [location, setLocation] = useState(() => searchParams.get("location") || ""); const [filter, setFilter] = useState<"all" | ListingType>("all"); const [sort, setSort] = useState<"relevance" | "rating">("relevance"); const [favoritesOnly, setFavoritesOnly] = useState(false); const [selected, setSelected] = useState<Listing | null>(null); const [sent, setSent] = useState(false); const [reported, setReported] = useState(false); const [favorites, setFavorites] = useState<string[]>(user ? listFavorites(user.id) : []);
+  const [query, setQuery] = useState(() => searchParams.get("q") || ""); const [location, setLocation] = useState(() => searchParams.get("location") || ""); const [filter, setFilter] = useState<"all" | ListingType>(() => (["technician","shop","seller"].includes(searchParams.get("type") || "") ? searchParams.get("type") as ListingType : "all")); const [sort, setSort] = useState<"relevance" | "rating">("relevance"); const [favoritesOnly, setFavoritesOnly] = useState(false); const [selected, setSelected] = useState<Listing | null>(null); const [sent, setSent] = useState(false); const [reported, setReported] = useState(false); const [favorites, setFavorites] = useState<string[]>(user ? listFavorites(user.id) : []);
   const listings = useMemo(() => listListings().filter((listing) => (listing.moderationStatus || "approved") === "approved" && (!favoritesOnly || favorites.includes(listing.id)) && (filter === "all" || listing.type === filter) && (!location || listing.location.toLowerCase().includes(location.toLowerCase())) && `${listing.name} ${listing.location} ${listing.services.join(" ")}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => sort === "rating" ? getListingRating(b) - getListingRating(a) : 0), [query, location, filter, sort, favoritesOnly, favorites]);
   const sendRequest = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!user || !selected) return; const data = new FormData(event.currentTarget); createRequest({ id: crypto.randomUUID(), customerId: user.id, listingId: selected.id, providerId: selected.ownerId, title: String(data.get("title")), details: String(data.get("details")), preferredDate: String(data.get("preferredDate") || ""), preferredTime: String(data.get("preferredTime") || ""), status: "open", createdAt: new Date().toISOString() }); setSelected(null); setSent(true); setTimeout(() => setSent(false), 3000); };
   const favorite = (listingId: string) => { if (!user) return; setFavorites(toggleFavorite(user.id, listingId)); };
