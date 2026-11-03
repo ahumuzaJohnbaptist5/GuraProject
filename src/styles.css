@@ -177,3 +177,16 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 @media(min-width:1400px){.app-shell .listing-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:1050px){.marketplace-hero-inner{grid-template-columns:1fr}.marketplace-showcase{max-width:520px;transform:none}.app-shell .listing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.marketplace-hero{padding:50px 0}.marketplace-intro h1{font-size:40px}.marketplace-intro>p{font-size:15px}.marketplace-search{flex-direction:column}.marketplace-search-input{min-width:0}.marketplace-select{border-left:0;border-top:1px solid #e2e8f0;min-width:0}.marketplace-search .marketplace-search-button{width:100%}.marketplace-benefits{grid-template-columns:1fr;padding-top:32px;padding-bottom:32px}.marketplace-next-inner{flex-direction:column;align-items:flex-start}.app-shell .listing-grid{grid-template-columns:1fr}.app-shell .toast{left:16px;right:16px;top:80px;max-width:none}}
+
+/* Dashboard state chips and supplier response presentation */
+.app-shell .request-card{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:22px;margin:14px 0}
+.app-shell .request-header{align-items:flex-start}
+.request-status{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:capitalize;background:#eff6ff;color:#1d4ed8}
+.request-status-open{background:#fef2f2;color:#b91c1c}
+.request-status-accepted{background:#eff6ff;color:#1d4ed8}
+.request-status-completed{background:#ecfdf5;color:#047857}
+.request-status-declined,.request-status-cancelled{background:#f1f5f9;color:#475569}
+.app-shell .message-thread{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin:12px 0;padding:8px 14px}
+.app-shell .message-thread p{border-bottom:1px solid #e2e8f0;padding:10px 0;margin:0}
+.app-shell .message-thread p:last-child{border-bottom:0}
+.app-shell .notification-panel,.app-shell .requests-panel{box-shadow:0 1px 3px #0f172a15}
