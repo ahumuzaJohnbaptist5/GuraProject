@@ -97,3 +97,21 @@ const localAuthAdapter: AuthAdapter = {
 };
 
 export default localAuthAdapter;
+
+
+// Account recovery is intentionally available only with the real backend.
+export const requestPasswordReset = async (email: string) => {
+  if (!API_URL) throw new Error("Password recovery is unavailable. Please contact support.");
+  return apiRequest<{ message: string }>("/api/auth/forgot-password", {
+    method: "POST", body: JSON.stringify({ email }),
+  });
+};
+
+export const completePasswordReset = async (token: string, password: string) => {
+  if (!API_URL) throw new Error("Password recovery is unavailable. Please contact support.");
+  const result = await apiRequest<{ message: string }>("/api/auth/reset-password", {
+    method: "POST", body: JSON.stringify({ token, password }),
+  });
+  saveSessionUser(null);
+  return result;
+};
