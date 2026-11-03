@@ -41,7 +41,27 @@ export const isApiMode = useApi;
 export const hydrateDomain = async () => {
   if (!useApi) return;
   const listings = await apiRequest<{ listings: Listing[] }>("/api/listings");
-  write(LISTINGS_KEY, listings.listings);
+  let visibleListings = listings.listings;
+  try {
+    const owned = await apiRequest<{ listings: Listing[] }>("/api/my/listings");
+    const byId = new Map(visibleListings.map((item) => [item.id, item]));
+    owned.listings.forEach((item) => byId.set(item.id, item));
+    visibleListings = [...byId.values()];
+  } catch (error) {
+    // Visitors can browse public listings without signing in.
+    if (error instanceof Error && !/Authentication required/i.test(error.message)) {
+      console.error("Unable to fetch your storefront listings", error);
+    }
+  }
+  try {
+    const adminListings = await apiRequest<{ listings: Listing[] }>("/api/admin/listings");
+    const byId = new Map(visibleListings.map((item) => [item.id, item]));
+    adminListings.listings.forEach((item) => byId.set(item.id, item));
+    visibleListings = [...byId.values()];
+  } catch {
+    // Non-administrators are expected to receive 403 here.
+  }
+  write(LISTINGS_KEY, visibleListings);
   try {
     const requests = await apiRequest<{ requests: ServiceRequest[] }>("/api/requests");
     write(REQUESTS_KEY, requests.requests);
@@ -158,26 +178,23 @@ export const toggleFavorite = (userId: string, listingId: string) => {
   write(FAVORITES_KEY, favorites);
   return favorites[userId];
 };
-export const createListing = (listing: Listing) => {
-  if (useApi) {
-    void apiRequest<{ listing: Listing }>("/api/listings", {
-      method: "POST",
-      body: JSON.stringify({
-        name: listing.name,
-        type: listing.type,
-        location: listing.location,
-        text: listing.text,
-        services: listing.services,
-        imageUrls: listing.images || [],
-        availability: listing.availability || null,
-      }),
-    }).then(({ listing: created }) => {
-      write(LISTINGS_KEY, [created, ...listListings().filter((item) => item.id !== listing.id)]);
-    }).catch((error) => console.error("Unable to create API listing", error));
-  }
-  const next = [listing, ...listListings()];
-  write(LISTINGS_KEY, next);
-  return listing;
+export const createListing = async (listing: Listing): Promise<Listing> => {
+  const created = useApi
+    ? (await apiRequest<{ listing: Listing }>("/api/listings", {
+        method: "POST",
+        body: JSON.stringify({
+          name: listing.name,
+          type: listing.type,
+          location: listing.location,
+          text: listing.text,
+          services: listing.services,
+          imageUrls: listing.images || [],
+          availability: listing.availability || null,
+        }),
+      })).listing
+    : listing;
+  write(LISTINGS_KEY, [created, ...listListings().filter((item) => item.id !== created.id)]);
+  return created;
 };
 export const updateListingStatus = (id: string, moderationStatus: Listing["moderationStatus"]) => {
   if (useApi && moderationStatus) {
@@ -189,16 +206,17 @@ export const updateListingStatus = (id: string, moderationStatus: Listing["moder
   const next = listListings().map((listing) => listing.id === id ? { ...listing, moderationStatus, verified: moderationStatus === "approved" ? listing.verified : false } : listing);
   write(LISTINGS_KEY, next);
 };
-export const updateListing = (id: string, update: Partial<Listing>) => {
-  if (useApi) {
-    const { images, ...rest } = update;
-    void apiRequest<{ listing: Listing }>(`/api/listings/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ ...rest, ...(images ? { imageUrls: images } : {}) }),
-    }).catch((error) => console.error("Unable to update API listing", error));
-  }
-  const next = listListings().map((listing) => listing.id === id ? { ...listing, ...update } : listing);
-  write(LISTINGS_KEY, next);
+export const updateListing = async (id: string, update: Partial<Listing>): Promise<Listing> => {
+  const previous = listListings().find((listing) => listing.id === id);
+  if (!previous) throw new Error("Listing not found. Refresh your dashboard and try again.");
+  const updated = useApi
+    ? (await apiRequest<{ listing: Listing }>(`/api/listings/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ...Object.fromEntries(Object.entries(update).filter(([key]) => key !== "images")), ...(update.images !== undefined ? { imageUrls: update.images } : {}) }),
+      })).listing
+    : { ...previous, ...update };
+  write(LISTINGS_KEY, listListings().map((listing) => listing.id === id ? updated : listing));
+  return updated;
 };
 export const createNotification = (notification: Notification) => {
   const next = [notification, ...read<Notification[]>(NOTIFICATIONS_KEY, [])];
