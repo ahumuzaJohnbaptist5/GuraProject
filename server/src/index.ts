@@ -1,13 +1,12 @@
-import { createHash, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import { z } from "zod";
 import { config } from "./config.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword, type AuthUser } from "./auth.js";
-import { pool, query } from "./db.js";
+import { query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
-import { createNotification, sendSecurityEmail } from "./notifications.js";
+import { createNotification } from "./notifications.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -95,84 +94,6 @@ app.post("/api/auth/login", authRateLimit, asyncRoute(async (request, response) 
   const { password_hash: _passwordHash, ...safeUser } = user;
   await createSession(user.id, response);
   response.json({ user: safeUser });
-}));
-
-// Recovery uses short-lived random tokens, stores only SHA-256 digests, and never
-// tells a requester whether an email exists in the database.
-const recoveryMessage = "If that email belongs to a GURA account, a reset link will be sent.";
-const recoveryHash = (token: string) => createHash("sha256").update(token).digest("hex");
-const resetRequestLimit = rateLimit(15 * 60_000, 5, "Too many reset requests. Please try later.");
-
-app.post("/api/auth/forgot-password", resetRequestLimit, asyncRoute(async (request, response) => {
-  const input = z.object({ email: z.string().trim().email().max(320) }).parse(request.body);
-  const found = await query<{ id: string; email: string; suspended: boolean }>(
-    "SELECT id, email, suspended FROM users WHERE email = lower($1)", [input.email],
-  );
-  const user = found.rows[0];
-  if (user && !user.suspended) {
-    const recent = await query<{ id: string }>(
-      "SELECT id FROM password_reset_tokens WHERE user_id = $1 AND created_at > now() - interval '2 minutes' LIMIT 1",
-      [user.id],
-    );
-    if (!recent.rows.length) {
-      const rawToken = randomBytes(32).toString("hex");
-      const hashed = recoveryHash(rawToken);
-      await query(
-        "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
-        [user.id, hashed],
-      );
-      const url = `${config.webOrigin}/reset-password?token=${encodeURIComponent(rawToken)}`;
-      try {
-        await sendSecurityEmail(user.email, "GURA APP — Reset your password",
-          `A password reset was requested for your GURA APP account.\n\nOpen this secure link to set a new password (valid for 30 minutes):\n${url}\n\nIf you did not request this, you can ignore this message. Do not share this link.`);
-      } catch (error) {
-        // Avoid leaving a usable token if email delivery was unsuccessful.
-        await query("DELETE FROM password_reset_tokens WHERE token_hash = $1", [hashed]);
-        console.error("GURA password reset email delivery failed", error instanceof Error ? error.message : "Unknown error");
-      }
-    }
-  }
-  response.json({ message: recoveryMessage });
-}));
-
-app.post("/api/auth/reset-password", resetRequestLimit, asyncRoute(async (request, response) => {
-  const input = z.object({
-    token: z.string().regex(/^[a-f0-9]{64}$/i),
-    password: z.string().min(12).max(128),
-  }).safeParse(request.body);
-  if (!input.success) {
-    response.status(400).json({ error: "Invalid reset link or password. Use at least 12 characters." });
-    return;
-  }
-  const passwordHash = await hashPassword(input.data.password);
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await client.query<{ id: string; user_id: string }>(
-      `SELECT p.id, p.user_id FROM password_reset_tokens p
-       JOIN users u ON u.id = p.user_id
-       WHERE p.token_hash = $1 AND p.used_at IS NULL AND p.expires_at > now() AND u.suspended = false
-       FOR UPDATE OF p`,
-      [recoveryHash(input.data.token)],
-    );
-    const reset = result.rows[0];
-    if (!reset) {
-      await client.query("ROLLBACK");
-      response.status(400).json({ error: "This password reset link is invalid or has expired. Request a new one." });
-      return;
-    }
-    await client.query("UPDATE users SET password_hash = $1 WHERE id = $2", [passwordHash, reset.user_id]);
-    await client.query("UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL", [reset.user_id]);
-    await client.query("DELETE FROM sessions WHERE user_id = $1", [reset.user_id]);
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-  response.clearCookie("gura_session", { httpOnly: true, sameSite: "lax", secure: config.production, path: "/" });
-  response.json({ message: "Password updated. Please sign in using your new password." });
 }));
 
 app.post("/api/auth/logout", asyncRoute(async (request, response) => {

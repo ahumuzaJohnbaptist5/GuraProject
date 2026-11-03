@@ -27,16 +27,14 @@ const sendWithResend = async (to: string, subject: string, text: string) => {
   }
 };
 
-export const sendSecurityEmail = async (to: string, subject: string, text: string) => {
+const sendEmail = async (to: string, subject: string, text: string) => {
   if (config.email.resendApiKey && config.email.resendFrom) {
     await sendWithResend(to, subject, text);
     return;
   }
   if (mailer) {
     await mailer.sendMail({ from: config.email.from, to, subject, text });
-    return;
   }
-  throw new Error("Password recovery email provider not configured.");
 };
 
 export const createNotification = async (userId: string, title: string, body: string) => {
@@ -53,7 +51,7 @@ export const createNotification = async (userId: string, title: string, body: st
   const notification = result.rows[0];
   if (notification && ((config.email.resendApiKey && config.email.resendFrom) || mailer)) {
     try {
-      await sendSecurityEmail(notification.email, `Gura: ${title}`, body);
+      await sendEmail(notification.email, `Gura: ${title}`, body);
     } catch (error) {
       console.error("Unable to send notification email", error);
     }
