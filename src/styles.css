@@ -439,3 +439,37 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 }
 .app-shell .gura-landing-hero .gura-landing-kicker span { background: #f59e0b; }
 .app-shell .gura-landing-hero .gura-landing-search { background: #ffffff; }
+
+/* Match the supplied navy reference across the entire GURA landing page. */
+.app-shell .gura-landing {
+  background: #0f2847;
+  color: #ffffff;
+}
+.app-shell .gura-landing .gura-landing-hero {
+  background: #0f2847;
+  border-color: #2c4867;
+  box-shadow: none;
+}
+.app-shell .gura-landing .gura-landing-section-title h2,
+.app-shell .gura-landing .gura-landing-trust strong {
+  color: #ffffff;
+}
+.app-shell .gura-landing .gura-landing-section-title p,
+.app-shell .gura-landing .gura-example-note,
+.app-shell .gura-landing .gura-landing-trust small {
+  color: #d4e1ef;
+}
+.app-shell .gura-landing .gura-landing-trust {
+  border-top-color: #41607e;
+}
+.app-shell .gura-landing .gura-category-tile {
+  background: #ffffff;
+  border-color: #dbe3ed;
+}
+.app-shell .gura-landing .gura-part-card {
+  background: #ffffff;
+}
+.app-shell .gura-landing .gura-urgent-banner {
+  background: #1e4165;
+  border: 1px solid #456586;
+}
