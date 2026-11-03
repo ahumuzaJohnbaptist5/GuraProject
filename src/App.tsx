@@ -110,17 +110,16 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
   };
   return <main className="auth-page gura-auth-page">
     <div className="auth-layout gura-auth-layout">
-      <section className="auth-welcome gura-auth-brand">
+      <section className="auth-welcome gura-auth-brand gura-reference-brand">
         <Link className="auth-logo" to="/" aria-label="GURA APP home"><img src="/gura-logo.png" alt="GURA APP" /></Link>
         <div className="auth-welcome-copy">
-          <p className="auth-kicker">GURA APP • Regional parts network</p>
-          <h1>Secure Regional Marketplace for Computer Parts</h1>
-          <p>Find parts, connect with trusted local businesses, and manage your work from one place.</p>
-          <Link className="gura-auth-explore" to="/directory">Explore marketplace <ArrowRight size={17}/></Link>
+          <p className="auth-kicker">Secure Regional Marketplace for Computer Parts</p>
+          <h1>SECURE REGIONAL<br/>MARKETPLACE<br/><span>FOR COMPUTER<br/>PARTS</span></h1>
+          <ul className="gura-auth-benefits"><li><CheckCircle2 size={22}/>Discovery &amp; Sourcing</li><li><CheckCircle2 size={22}/>Urgent Requests</li><li><CheckCircle2 size={22}/>Secure Transactions <small>(planned)</small></li></ul>
         </div>
-        <div className="gura-auth-trust"><ShieldCheck size={18}/><span>Built for technicians, repair shops and suppliers</span></div>
+        <div className="gura-auth-trust"><ShieldCheck size={18}/><span>Connecting technicians, shops and suppliers</span></div>
       </section>
-      <div className="auth-card gura-auth-card">
+      <div className="gura-reference-stage"><div className="gura-laptop"><div className="gura-laptop-screen"><div className="auth-card gura-auth-card">
         <p className="eyebrow">{mode === "login" ? "Welcome back" : "Join the GURA network"}</p>
         <h1>{mode === "login" ? "Sign in to GURA" : "Create your account"}</h1>
         <p className="muted-text">{mode === "login" ? "Enter your account credentials to continue." : "Tell us a little about yourself to get started."}</p>
@@ -162,7 +161,7 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
         </form>
         <p className="switch-auth">{mode === "login" ? <>New to GURA? <Link to="/register">Create an account</Link></> : <>Already registered? <Link to="/login">Sign in</Link></>}</p>
         <p className="gura-auth-footnote"><ShieldCheck size={14}/> Secure connection · Email sign-in is supported; phone sign-in is planned.</p>
-      </div>
+      </div></div><div className="gura-laptop-base" aria-hidden="true"><span className="gura-laptop-trackpad"/></div></div></div>
     </div>
   </main>;
 }

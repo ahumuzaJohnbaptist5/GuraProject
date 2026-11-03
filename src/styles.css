@@ -250,3 +250,55 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 }
 @media(max-width:400px){.app-shell .gura-role-options{gap:5px}.app-shell .gura-role-option{font-size:10px;padding:5px}.app-shell .gura-auth-card{padding:26px 20px}}
 @media(prefers-reduced-motion:reduce){.gura-spinner{animation:none}}
+
+
+/* Reference-inspired GURA sign-in: no university branding, real interactive form */
+.app-shell .gura-auth-page{padding:0!important;min-height:calc(100vh - 142px);background:#f0ece6;overflow:hidden}
+.app-shell .gura-auth-layout{width:100%;max-width:none;min-height:calc(100vh - 142px);margin:0;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:0;border-radius:0;box-shadow:none;background:transparent;overflow:visible}
+.app-shell .gura-reference-brand{background:radial-gradient(circle at 25% 5%,#123158 0,#0b1d32 60%,#081729 100%);min-height:760px;padding:clamp(36px,5vw,88px) clamp(30px,5.4vw,92px);display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.app-shell .gura-reference-brand:after{width:70vw;height:40vw;left:-30vw;right:auto;bottom:-38vw;border:20px solid #196edb;box-shadow:0 22px 0 #53b62b;opacity:.7}
+.app-shell .gura-reference-brand .auth-logo{width:min(280px,100%);height:155px;padding:0;background:none;border:0;border-radius:0;justify-content:flex-start}
+.app-shell .gura-reference-brand .auth-logo img{height:100%;width:100%;object-fit:contain;object-position:left center;filter:drop-shadow(0 7px 14px #0004)}
+.app-shell .gura-reference-brand .auth-welcome-copy{margin:18px 0 38px;max-width:800px}
+.app-shell .gura-reference-brand .auth-kicker{font-size:13px;letter-spacing:0;color:#bed4ef;font-weight:500;margin:0 0 30px}
+.app-shell .gura-reference-brand .auth-welcome-copy h1{font:800 clamp(36px,4vw,72px)/1.15 "Inter",sans-serif;letter-spacing:-.045em;color:#fff;max-width:790px;margin:0 0 34px;text-transform:uppercase}
+.app-shell .gura-reference-brand .auth-welcome-copy h1 span{color:#f9bd4a}
+.gura-auth-benefits{list-style:none;padding:0;margin:25px 0 0;display:grid;gap:16px}
+.gura-auth-benefits li{display:flex;gap:14px;align-items:center;color:#f1f5f9;font-size:clamp(16px,1.7vw,25px);font-weight:500}
+.gura-auth-benefits li svg{color:#a3b4c9;fill:#cbd5e1;stroke:#0f172a;flex:none}
+.gura-auth-benefits li small{font-size:11px;color:#c0d0e4;font-weight:400}
+.app-shell .gura-reference-brand .gura-auth-trust{margin-top:28px;color:#aac1da;font-size:12px}
+.gura-reference-stage{min-height:760px;width:100%;display:flex;justify-content:center;align-items:center;position:relative;background:linear-gradient(145deg,#e9e2d9,#f6f7f8 40%,#e4d4c0 100%);padding:48px 18px 70px;overflow:hidden}
+.gura-reference-stage:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 85% 22%,#ffffffb8,transparent 56%);pointer-events:none}
+.gura-laptop{width:min(100%,760px);position:relative;z-index:1;filter:drop-shadow(0 25px 25px #0f172a34)}
+.gura-laptop-screen{min-height:590px;display:flex;justify-content:center;align-items:center;background:linear-gradient(145deg,#f5faff,#e2edfa);border:18px solid #161a23;border-bottom-width:24px;border-radius:24px 24px 8px 8px;position:relative;padding:24px 18px}
+.gura-laptop-screen:before{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#444957;top:-12px;left:50%}
+.gura-laptop-base{height:25px;margin:0 -6%;border-radius:4px 4px 60% 60% / 5px 5px 20px 20px;background:linear-gradient(#bdc3cc,#5f6773 58%,#383e49);border:1px solid #68717d;position:relative}
+.gura-laptop-trackpad{display:block;position:absolute;top:0;left:38%;width:24%;height:7px;background:#838c9a;border-radius:0 0 8px 8px}
+.app-shell .gura-laptop .gura-auth-card{width:min(100%,440px);max-width:440px;max-height:none;padding:27px 26px 25px;margin:0;align-self:center;border:1px solid #dbe3ed;border-radius:14px;box-shadow:0 8px 25px #0f172a1c;background:#fff}
+.app-shell .gura-laptop .gura-auth-card .eyebrow{display:none}
+.app-shell .gura-laptop .gura-auth-card h1{text-align:center;font-size:26px;margin:0 0 8px;color:#10203a}
+.app-shell .gura-laptop .gura-auth-card .muted-text{text-align:center;font-size:12px}
+.app-shell .gura-laptop .gura-role-context{margin-top:18px}
+.app-shell .gura-laptop .gura-role-options{gap:4px;background:#eef1f6;padding:4px;border-radius:9px}
+.app-shell .gura-laptop .gura-role-option{border-color:transparent;font-size:11px;min-height:34px}
+.app-shell .gura-laptop .gura-role-option.selected{background:#fff;color:#0f172a;border-color:#dce3ed;box-shadow:0 1px 4px #0001}
+.app-shell .gura-laptop .gura-role-note{margin-top:7px}
+.app-shell .gura-laptop .gura-login-form{margin-top:18px;gap:13px}
+.app-shell .gura-laptop .gura-login-form input{min-height:41px;padding:9px 12px}
+.app-shell .gura-laptop .gura-auth-submit{min-height:44px;background:#1972e6;box-shadow:none}
+.app-shell .gura-laptop .gura-auth-submit:hover{background:#155fbd}
+.app-shell .gura-laptop .gura-auth-footnote{margin-top:15px;padding-top:12px}
+@media(max-width:1080px){.app-shell .gura-reference-brand{padding:36px 30px}.app-shell .gura-reference-brand .auth-welcome-copy h1{font-size:clamp(32px,4vw,48px)}.gura-laptop-screen{border-width:12px;border-bottom-width:20px;padding:15px 10px}.gura-reference-stage{padding:30px 13px 55px}}
+@media(max-width:820px){
+ .app-shell .gura-auth-page{background:#f8fafc;overflow:visible}
+ .app-shell .gura-auth-layout{display:block;min-height:0;width:100%;max-width:none}
+ .app-shell .gura-reference-brand{display:none}
+ .gura-reference-stage{background:#f8fafc;min-height:calc(100vh - 150px);padding:25px 16px 42px;overflow:visible}
+ .gura-reference-stage:before{display:none}
+ .gura-laptop{width:min(100%,490px);filter:none}
+ .gura-laptop-screen{min-height:0;border:0;border-radius:0;background:none;padding:0}
+ .gura-laptop-screen:before,.gura-laptop-base{display:none}
+ .app-shell .gura-laptop .gura-auth-card{max-width:none;width:100%;padding:30px 24px;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 8px 24px #0f172a12}
+}
+@media(max-width:400px){.app-shell .gura-laptop .gura-auth-card{padding:26px 18px}.app-shell .gura-laptop .gura-auth-card h1{font-size:23px}}
