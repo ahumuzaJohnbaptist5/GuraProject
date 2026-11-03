@@ -120,7 +120,6 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [roleContext, setRoleContext] = useState<"technician" | "supplier" | "administrator">("technician");
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "customer" as Role });
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -161,15 +160,6 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
         <p className="eyebrow">{mode === "login" ? "Welcome back" : "Join the GURA network"}</p>
         <h1>{mode === "login" ? "Sign in to GURA" : "Create your account"}</h1>
         <p className="muted-text">{mode === "login" ? "Enter your account credentials to continue." : "Tell us a little about yourself to get started."}</p>
-        {mode === "login" && <div className="gura-role-context">
-          <p className="gura-field-title">I am signing in as</p>
-          <div className="gura-role-options" role="group" aria-label="Sign-in role context">
-            {([["technician","Technician"],["supplier","Supplier / Shop"],["administrator","Admin"]] as const).map(([value,label]) =>
-              <button type="button" key={value} aria-pressed={roleContext === value} className={roleContext === value ? "gura-role-option selected" : "gura-role-option"} onClick={() => setRoleContext(value)}>{label}</button>
-            )}
-          </div>
-          <p className="gura-role-note">Your actual access is determined securely by your account, not this selection.</p>
-        </div>}
         <form onSubmit={submit} className="gura-login-form">
           {mode === "register" && <>
             <label>Full name<input required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}/></label>
@@ -186,11 +176,6 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
               </button>
             </span>
           </label>
-          {mode === "login" && roleContext === "administrator" && <div className="gura-mfa-reserved" aria-label="Planned administrator verification">
-            <div><LockKeyhole size={17}/><strong>Admin verification</strong><span className="gura-planned-badge">Planned</span></div>
-            <p>A 6-digit verification step will be added when server-side MFA is implemented. It is not required or active yet.</p>
-            <input type="text" aria-label="Future six-digit verification code" placeholder="••••••" inputMode="numeric" maxLength={6} disabled/>
-          </div>}
           {error && <div className="gura-auth-error" role="alert"><AlertTriangle size={18}/><span>{error}</span></div>}
           <button className="button full gura-auth-submit" type="submit" disabled={loading} aria-busy={loading}>
             {loading && <LoaderCircle size={18} className="gura-spinner" aria-hidden="true"/>}
