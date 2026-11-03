@@ -147,6 +147,15 @@ const listingInputSchema = z.object({
 const listingSelect = `id, owner_id AS "ownerId", name, type, location, text, services,
   image_urls AS "images", verified, rating, availability, moderation_status AS "moderationStatus"`;
 
+app.get("/api/my/listings", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  const result = await query(
+    `SELECT ${listingSelect} FROM listings WHERE owner_id = $1 ORDER BY created_at DESC`,
+    [user.id],
+  );
+  response.json({ listings: result.rows });
+}));
+
 app.get("/api/admin/listings", requireUser, asyncRoute(async (_request, response) => {
   const user = response.locals.user as AuthUser;
   if (user.role !== "administrator") {
