@@ -102,3 +102,91 @@ html,body,#root { background:#f8fafc; color:#172b3a; color-scheme:light; }
 .app-shell .fresh-orbit,.app-shell .fresh-orbit-two { border-color:#b9cfe9; }
 .app-shell .fresh-strip-inner i { background:#3879c5; }
 .app-shell .fresh-join .light-button { color:#172b3a; background:#fff; }
+
+
+/* GURA marketplace design system — light only */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+:root{font-family:"Inter",sans-serif;color-scheme:light;--gura-navy:#0f172a;--gura-blue:#2563eb;--gura-emerald:#059669;--gura-muted:#64748b;--gura-surface:#ffffff;--gura-bg:#f8fafc;--gura-border:#e2e8f0;--gura-shadow:0 1px 3px rgba(0,0,0,.1)}
+body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:var(--gura-navy)}
+.app-shell .site-header{height:76px;background:var(--gura-surface);border-bottom:1px solid var(--gura-border)}
+.app-shell .nav{color:var(--gura-navy)}
+.app-shell .nav a:hover,.app-shell .nav-logout:hover{color:var(--gura-blue)}
+.app-shell .button{background:var(--gura-blue);color:#fff;border-radius:10px;box-shadow:var(--gura-shadow);font-weight:700;transition:background .15s ease,transform .15s ease}
+.app-shell .button:hover{background:#1d4ed8;transform:translateY(-1px)}
+.app-shell .button:focus-visible,.app-shell a:focus-visible,.app-shell input:focus-visible,.app-shell select:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.app-shell .listing,.app-shell .panel,.app-shell .metric-card,.app-shell .modal,.app-shell .auth-card{border:1px solid var(--gura-border);box-shadow:var(--gura-shadow);border-radius:14px;background:#fff;color:var(--gura-navy)}
+.app-shell .page h1,.app-shell .panel h2,.app-shell .listing h3{color:var(--gura-navy)}
+.app-shell .page h1{letter-spacing:-.04em;font-weight:700}
+.app-shell .lede,.app-shell .listing p,.app-shell .panel p,.app-shell .muted-text{color:var(--gura-muted)}
+.app-shell .tag{background:#eff6ff;color:#1d4ed8;border-radius:99px;font-size:11px}
+.app-shell .verified{color:#047857;background:#ecfdf5;border-radius:99px;padding:5px 9px}
+.app-shell .listing-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.app-shell .listing{display:flex;flex-direction:column;padding:24px;transition:box-shadow .2s ease,transform .2s ease}
+.app-shell .listing:hover{box-shadow:0 10px 25px rgba(15,23,42,.09);transform:translateY(-2px)}
+.app-shell .listing-actions{margin-top:auto;padding-top:14px}
+.app-shell .listing-icon{width:58px;height:58px;border-radius:14px;background:#eff6ff;color:#2563eb}
+.app-shell .listing-icon svg{width:28px;height:28px}
+.app-shell .directory-tools{display:flex;flex-wrap:wrap;gap:12px}
+.app-shell .directory-tools .search-field{min-width:240px}
+.app-shell .directory-tools select{min-width:145px;flex:1}
+.app-shell input,.app-shell select,.app-shell textarea,.app-shell .search-field{background:#fff;color:var(--gura-navy);border:1px solid #cbd5e1}
+.app-shell .empty-state{background:#fff;border:1px dashed #cbd5e1;color:var(--gura-muted)}
+.app-shell .toast{position:fixed;right:24px;top:88px;z-index:30;max-width:360px;padding:16px 20px;background:#ecfdf5;color:#047857;box-shadow:0 8px 30px rgba(15,23,42,.15);border:1px solid #a7f3d0;border-radius:12px}
+.marketplace-home{background:#f8fafc}
+.marketplace-hero{position:relative;padding:88px 0 82px;background:linear-gradient(150deg,#f8fafc 5%,#eef5ff 100%);overflow:hidden}
+.marketplace-hero:before{content:"";position:absolute;width:430px;height:430px;right:-160px;top:-220px;background:#dbeafe;border-radius:50%;filter:blur(24px);opacity:.7}
+.marketplace-hero-inner{position:relative;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr);align-items:center;gap:50px}
+.marketplace-intro h1{font:800 clamp(40px,4.6vw,64px)/1.1 "Inter",sans-serif;letter-spacing:-.052em;margin:22px 0;color:#0f172a;max-width:800px}
+.marketplace-intro h1 span{color:#2563eb}
+.marketplace-intro>p{max-width:680px;font-size:17px;line-height:1.7;color:#64748b}
+.marketplace-kicker{display:inline-flex;align-items:center;gap:10px;background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;border-radius:99px;padding:9px 13px;font-size:12px;font-weight:700}
+.marketplace-kicker-dot,.marketplace-live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#059669;flex:none}
+.marketplace-search{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:32px 0 12px;padding:10px;background:#fff;border:1px solid #e2e8f0;border-radius:15px;box-shadow:0 12px 30px #0f172a12}
+.marketplace-search label{display:flex;align-items:center;gap:8px;min-height:48px;color:#64748b}
+.marketplace-search-input{flex:2;min-width:210px;padding:0 12px}
+.marketplace-search-input input{flex:1;min-width:0;padding:10px 3px;outline:none;border:0;font-size:14px;background:transparent;color:#0f172a}
+.marketplace-search-input input:focus{outline:none}
+.marketplace-select{padding:0 10px;border-left:1px solid #e2e8f0;flex:1;min-width:128px}
+.marketplace-select select{width:100%;border:0;outline:none;background:#fff;color:#334155;font-size:13px;padding:8px 4px;min-width:0}
+.marketplace-search .marketplace-search-button{min-width:150px;box-shadow:none;padding:12px 16px;white-space:nowrap}
+.marketplace-intro .marketplace-search-note{display:flex;gap:8px;align-items:flex-start;margin:0;color:#64748b;font-size:12px;line-height:1.6}
+.marketplace-search-note svg{flex:none;margin-top:2px;color:#059669}
+.marketplace-hero-actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:28px}
+.marketplace-outline-link{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:13px;color:#1e40af}
+.marketplace-outline-link:hover{text-decoration:underline}
+.marketplace-showcase{position:relative;background:#fff;padding:24px;border:1px solid #e2e8f0;border-radius:20px;box-shadow:0 20px 50px #1e293b15;transform:rotate(1deg)}
+.marketplace-showcase-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700;font-size:12px;color:#334155}
+.marketplace-showcase-top>span:first-child{display:flex;align-items:center;gap:8px}
+.marketplace-showcase-label{color:#64748b;font-size:11px;font-weight:500}
+.marketplace-showcase-title{margin:30px 0 16px;font-size:23px;font-weight:800;letter-spacing:-.035em}
+.marketplace-category-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.marketplace-category-preview span{min-height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#eff6ff;border:1px solid #dbeafe;color:#2563eb;border-radius:13px}
+.marketplace-category-preview b{font-size:12px;color:#334155}
+.marketplace-showcase-footer{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px}
+.marketplace-showcase-footer svg{color:#059669}
+.marketplace-benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding-top:56px;padding-bottom:56px}
+.marketplace-benefits article{display:flex;align-items:flex-start;gap:14px;padding:24px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 1px 3px #0f172a10}
+.marketplace-benefit-icon{display:grid;place-items:center;min-width:46px;height:46px;background:#eff6ff;color:#2563eb;border-radius:12px}
+.marketplace-benefits h3{font-size:15px;font-weight:700;margin:0 0 9px}
+.marketplace-benefits p{font-size:13px;color:#64748b;line-height:1.6;margin:0}
+.marketplace-next{padding:54px 0;background:#eff6ff;border-top:1px solid #dbeafe}
+.marketplace-next-inner{display:flex;justify-content:space-between;gap:26px;align-items:center}
+.marketplace-next h2{font-size:30px;letter-spacing:-.04em;color:#0f172a;margin:8px 0}
+.marketplace-next p{color:#64748b;line-height:1.6}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(min-width:1400px){.app-shell .listing-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1050px){.marketplace-hero-inner{grid-template-columns:1fr}.marketplace-showcase{max-width:520px;transform:none}.app-shell .listing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.marketplace-hero{padding:50px 0}.marketplace-intro h1{font-size:40px}.marketplace-intro>p{font-size:15px}.marketplace-search{flex-direction:column}.marketplace-search-input{min-width:0}.marketplace-select{border-left:0;border-top:1px solid #e2e8f0;min-width:0}.marketplace-search .marketplace-search-button{width:100%}.marketplace-benefits{grid-template-columns:1fr;padding-top:32px;padding-bottom:32px}.marketplace-next-inner{flex-direction:column;align-items:flex-start}.app-shell .listing-grid{grid-template-columns:1fr}.app-shell .toast{left:16px;right:16px;top:80px;max-width:none}}
+
+/* Dashboard state chips and supplier response presentation */
+.app-shell .request-card{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:22px;margin:14px 0}
+.app-shell .request-header{align-items:flex-start}
+.request-status{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:capitalize;background:#eff6ff;color:#1d4ed8}
+.request-status-open{background:#fef2f2;color:#b91c1c}
+.request-status-accepted{background:#eff6ff;color:#1d4ed8}
+.request-status-completed{background:#ecfdf5;color:#047857}
+.request-status-declined,.request-status-cancelled{background:#f1f5f9;color:#475569}
+.app-shell .message-thread{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin:12px 0;padding:8px 14px}
+.app-shell .message-thread p{border-bottom:1px solid #e2e8f0;padding:10px 0;margin:0}
+.app-shell .message-thread p:last-child{border-bottom:0}
+.app-shell .notification-panel,.app-shell .requests-panel{box-shadow:0 1px 3px #0f172a15}
