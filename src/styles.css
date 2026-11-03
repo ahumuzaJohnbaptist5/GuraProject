@@ -608,3 +608,136 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
   .app-shell .gura-profile-security{grid-column:auto}
   .app-shell .gura-dashboard-profile-banner{padding:15px;gap:10px}
 }
+
+
+/* Site-wide density pass — November 2026.
+   Tighter vertical rhythm across home, directory, dashboard, auth and footer.
+   Preserve accessible touch targets, wrapping and the existing profile design. */
+.app-shell .site-header {height:64px}
+.app-shell .site-header .brand {height:52px}
+.app-shell .site-header .nav {gap:16px}
+
+.app-shell .page {padding-top:27px;padding-bottom:44px}
+.app-shell .page>.eyebrow {margin-bottom:7px}
+.app-shell .page>h1 {margin-top:0;margin-bottom:9px;font-size:clamp(27px,3vw,38px)}
+.app-shell .page>.lede {margin-top:0;margin-bottom:12px;line-height:1.5}
+.app-shell .dashboard-head {margin-bottom:17px;gap:14px}
+.app-shell .dashboard-head h1 {margin:4px 0 7px}
+.app-shell .dashboard-head .lede {line-height:1.45}
+.app-shell .dashboard-grid {gap:15px}
+.app-shell .metric-grid {gap:10px;margin-top:14px}
+.app-shell .metric-card {padding:13px 15px}
+.app-shell .metric-card strong {font-size:26px;margin-top:4px}
+.app-shell .panel {padding:19px 21px}
+.app-shell .panel h2 {margin-top:0;margin-bottom:9px}
+.app-shell .panel .panel-title {margin-bottom:12px;gap:10px}
+.app-shell .panel .muted-text {line-height:1.5}
+.app-shell .notification-panel,
+.app-shell .listing-manager,
+.app-shell .favorites-panel,
+.app-shell .admin-users-panel,
+.app-shell .audit-panel,
+.app-shell .demo-data-panel {margin-top:14px}
+.app-shell .notification-list,
+.app-shell .favorite-list {margin-top:10px}
+.app-shell .notification {padding:10px 0;gap:10px}
+.app-shell .favorite-row {padding:10px 0}
+.app-shell .admin-row,.app-shell .audit-row {padding-top:10px;padding-bottom:10px}
+.app-shell .request-card {padding:16px 18px;margin:10px 0}
+.app-shell .request-card p {line-height:1.5}
+.app-shell .request-actions {gap:8px}
+.app-shell .listing-form {gap:11px;margin:13px 0;padding-top:13px}
+.app-shell .media-room {padding:12px 0 4px}
+.app-shell .media-grid {margin-top:10px}
+.app-shell .listing-owner-card .admin-row {padding-top:11px;padding-bottom:11px}
+.app-shell .service-chips {margin:9px 0;gap:5px}
+.app-shell .report-form {margin-top:14px;padding-top:12px}
+.app-shell .empty-state {margin:20px 0;padding:24px}
+.app-shell .empty-state.compact {margin:12px 0;padding:18px}
+.app-shell .directory-tools {margin-top:18px;gap:9px}
+.app-shell .directory-tools select {min-height:42px}
+.app-shell .listing-grid {gap:13px}
+.app-shell .listing {padding:17px 18px}
+.app-shell .listing-icon {width:48px;height:48px;border-radius:11px}
+.app-shell .listing-icon svg {width:24px;height:24px}
+.app-shell .listing h3 {margin-top:12px;margin-bottom:8px;line-height:1.35}
+.app-shell .listing p {line-height:1.5}
+.app-shell .listing-actions {padding-top:10px}
+.app-shell .listing .button {margin-top:10px}
+.app-shell .modal {padding:22px}
+.app-shell .image-gallery {gap:9px}
+.app-shell .slot-fields {gap:9px}
+.app-shell .appointment-editor {padding:10px;margin:9px 0;gap:8px}
+
+.app-shell .gura-landing {padding-top:19px;padding-bottom:40px}
+.app-shell .gura-landing-hero {padding:26px 30px 24px}
+.app-shell .gura-landing-hero h1 {font-size:clamp(31px,3.8vw,49px);margin:15px 0 9px}
+.app-shell .gura-landing-hero>p:not(.gura-landing-disclaimer) {margin-bottom:16px;line-height:1.5}
+.app-shell .gura-landing-search {padding:7px;gap:7px}
+.app-shell .gura-landing-section {padding-top:23px}
+.app-shell .gura-landing-section-title {margin-bottom:12px;gap:9px}
+.app-shell .gura-landing-section-title h2 {font-size:21px;margin-bottom:3px}
+.app-shell .gura-landing-categories,
+.app-shell .gura-landing-products {gap:11px}
+.app-shell .gura-category-tile {min-height:126px;padding:15px;gap:7px}
+.app-shell .gura-category-icon {height:40px;width:40px}
+.app-shell .gura-part-card {min-height:0}
+.app-shell .gura-part-visual {height:78px}
+.app-shell .gura-part-details {padding:13px 15px}
+.app-shell .gura-part-details h3 {min-height:0;margin:9px 0}
+.app-shell .gura-part-footer {padding:10px 15px}
+.app-shell .gura-urgent-banner {margin-top:23px;margin-bottom:14px;padding:19px 23px;gap:13px}
+.app-shell .gura-landing-trust {padding-top:16px;gap:16px}
+.app-shell .gura-landing-trust>div {gap:9px}
+
+.app-shell .gura-auth-layout {min-height:0}
+.app-shell .gura-reference-brand {padding-top:28px;padding-bottom:28px}
+.app-shell .gura-reference-brand .auth-logo {height:115px}
+.app-shell .gura-reference-brand .auth-welcome-copy {margin:14px 0 21px}
+.app-shell .gura-reference-brand .auth-kicker {margin-bottom:14px}
+.app-shell .gura-reference-brand .auth-welcome-copy h1 {font-size:clamp(32px,3.6vw,56px);margin-bottom:17px;line-height:1.12}
+.app-shell .gura-auth-benefits {margin-top:15px;gap:11px}
+.app-shell .gura-reference-brand .gura-auth-trust {margin-top:17px}
+.app-shell .gura-laptop .gura-auth-card {padding:21px 23px}
+.app-shell .gura-laptop .gura-login-form {margin-top:13px;gap:10px}
+.app-shell .gura-laptop .gura-auth-footnote {margin-top:11px;padding-top:9px}
+.app-shell .gura-reference-stage {padding-top:22px;padding-bottom:30px}
+
+.app-shell footer.gura-site-footer .gura-footer-main {padding-top:26px;padding-bottom:23px;gap:20px}
+.app-shell .gura-footer-brand img {height:51px}
+.app-shell .gura-footer-brand p {margin-top:7px;line-height:1.5}
+.app-shell .gura-footer-links {gap:8px}
+.app-shell .gura-footer-links h2 {margin:3px 0 4px}
+.app-shell .gura-footer-bottom {padding-top:12px;padding-bottom:12px}
+@media(max-width:950px){
+  .app-shell .listing-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:820px){
+  .app-shell .gura-reference-stage {padding:20px 14px 28px}
+  .app-shell .gura-laptop .gura-auth-card {padding:23px 20px}
+  .app-shell .gura-footer-main {gap:16px}
+}
+@media(max-width:760px){
+  .app-shell .site-header {height:62px}
+  .app-shell .page {padding-top:19px;padding-bottom:32px}
+  .app-shell .panel {padding:16px}
+  .app-shell .directory-tools {margin-top:13px}
+  .app-shell .listing-grid {grid-template-columns:1fr;gap:10px}
+  .app-shell .listing {padding:15px}
+  .app-shell .gura-landing {padding-top:10px;padding-bottom:30px}
+  .app-shell .gura-landing-hero {padding:21px 19px}
+  .app-shell .gura-landing-hero h1 {font-size:clamp(29px,8vw,36px)}
+  .app-shell .gura-landing-section {padding-top:18px}
+  .app-shell .gura-landing-categories {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .app-shell .gura-category-tile {min-height:116px;padding:13px}
+  .app-shell .gura-urgent-banner {padding:17px 19px;margin-top:18px}
+  .app-shell .gura-auth-benefits {gap:9px}
+  .app-shell footer.gura-site-footer .gura-footer-main {padding:24px 20px 19px;gap:16px}
+  .app-shell .gura-footer-bottom {padding:12px 20px}
+}
+@media(max-width:420px){
+  .app-shell .gura-landing-categories {grid-template-columns:1fr}
+  .app-shell .gura-category-tile {min-height:0}
+  .app-shell .metric-grid {gap:8px}
+  .app-shell .metric-card {padding:11px 12px}
+}
