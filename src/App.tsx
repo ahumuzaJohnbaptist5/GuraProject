@@ -13,7 +13,29 @@ function Header({ user, onLogout }: { user: User | null; onLogout: () => void })
   const unread = user ? listNotifications(user.id).filter((item) => !item.read).length : 0;
   return <header className="site-header"><Link className="brand" to="/" aria-label="Gura home"><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></Link><button className="menu-button" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button><nav className={open ? "nav open" : "nav"}><Link to="/directory" onClick={() => setOpen(false)}>Marketplace</Link><Link to="/#urgent-requests" onClick={() => setOpen(false)}>Urgent Requests</Link><Link to="/directory?type=shop" onClick={() => setOpen(false)}>Suppliers</Link>{user ? <><Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard{unread > 0 && <span className="notification-badge">{unread}</span>}</Link><button className="nav-logout" onClick={onLogout}><LogOut size={16} /> Sign out</button></> : <><Link to="/login" onClick={() => setOpen(false)}>Sign in</Link><Link className="button small" to="/register" onClick={() => setOpen(false)}>Get started</Link></>}</nav></header>;
 }
-function Layout({ children, user, onLogout }: { children: React.ReactNode; user: User | null; onLogout: () => void }) { return <div className="app-shell"><Header user={user} onLogout={onLogout} />{children}<footer><div className="footer-inner"><strong><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></strong><span>Trusted electronics, made simple.</span><span>GURA regional marketplace</span></div></footer></div>; }
+function Layout({ children, user, onLogout }: { children: React.ReactNode; user: User | null; onLogout: () => void }) {
+  return <div className="app-shell">
+    <Header user={user} onLogout={onLogout}/>{children}
+    <footer className="gura-site-footer">
+      <div className="gura-footer-main">
+        <div className="gura-footer-brand"><Link to="/" aria-label="GURA APP home"><img src="/gura-logo.png" alt="GURA APP"/></Link><p>Connecting technicians, repair shops and suppliers across the region.</p></div>
+        <nav className="gura-footer-links" aria-label="Footer quick links">
+          <h2>Quick Links</h2>
+          <Link to="/">Home</Link>
+          <Link to="/directory">Marketplace</Link>
+          <Link to="/directory?type=shop">Suppliers</Link>
+          <a href="/#urgent-requests">Urgent Requests</a>
+        </nav>
+        <nav className="gura-footer-links" aria-label="Footer account links">
+          <h2>Your Account</h2>
+          {user ? <Link to="/dashboard">Dashboard</Link> : <><Link to="/login">Sign In</Link><Link to="/register">Get Started</Link></>}
+          <Link to="/directory">Browse Local Businesses</Link>
+        </nav>
+      </div>
+      <div className="gura-footer-bottom"><span>© {new Date().getFullYear()} GURA APP. All rights reserved.</span><span>Regional Computer Parts Network</span></div>
+    </footer>
+  </div>;
+}
 function FreshHome() {
   const navigate = useNavigate();
   const [part, setPart] = useState("");
