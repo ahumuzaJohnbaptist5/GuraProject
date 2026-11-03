@@ -614,4 +614,37 @@ app.use((error: unknown, _request: Request, response: Response, _next: NextFunct
   response.status(500).json({ error: "Internal server error." });
 });
 
-app.listen(config.port, () => console.log(`Gura API listening on http://127.0.0.1:${config.port}`));
+// Private administrator provisioning. No public admin registration or credentials in source.
+const provisionAdministrator = async () => {
+  const email = (process.env.GURA_ADMIN_EMAIL || "").trim().toLowerCase();
+  const password = process.env.GURA_ADMIN_PASSWORD || "";
+  if (!email && !password) return;
+  if (!z.string().email().safeParse(email).success || password.length < 12 || password.length > 128) {
+    console.warn("Administrator provisioning skipped: provide a valid GURA_ADMIN_EMAIL and a GURA_ADMIN_PASSWORD of 12-128 characters.");
+    return;
+  }
+  const existing = await query<{ role: string }>(
+    "SELECT role FROM users WHERE lower(email) = $1 LIMIT 1", [email],
+  );
+  if (existing.rows.length) {
+    if (existing.rows[0].role !== "administrator") {
+      console.warn("Administrator provisioning skipped: email already belongs to a non-administrator. Choose a different private email.");
+    }
+    return; // Never overwrite an existing user's role or password at startup.
+  }
+  const passwordHash = await hashPassword(password);
+  const created = await query(
+    `INSERT INTO users (name, email, password_hash, role, verified)
+     VALUES ('GURA Administrator', $1, $2, 'administrator', TRUE)
+     ON CONFLICT (email) DO NOTHING RETURNING id`,
+    [email, passwordHash],
+  );
+  if (created.rowCount) console.log("Private GURA administrator account provisioned.");
+};
+
+void provisionAdministrator()
+  .then(() => app.listen(config.port, () => console.log(`Gura API listening on http://127.0.0.1:${config.port}`)))
+  .catch((error) => {
+    console.error("Gura startup failed:", error);
+    process.exitCode = 1;
+  });
