@@ -190,3 +190,59 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell .message-thread p{border-bottom:1px solid #e2e8f0;padding:10px 0;margin:0}
 .app-shell .message-thread p:last-child{border-bottom:0}
 .app-shell .notification-panel,.app-shell .requests-panel{box-shadow:0 1px 3px #0f172a15}
+
+
+/* GURA authentication — split-screen desktop, centered mobile; light application shell */
+.app-shell .gura-auth-page{min-height:calc(100vh - 146px);padding:56px 24px;background:#f8fafc}
+.app-shell .gura-auth-layout{width:min(100%,1100px);min-height:620px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:22px;box-shadow:0 10px 38px rgba(15,23,42,.08);overflow:hidden}
+.app-shell .gura-auth-brand{display:flex;flex-direction:column;justify-content:space-between;padding:46px;background:linear-gradient(145deg,#0f172a 0%,#1e293b 70%,#182e55 100%);color:#fff}
+.app-shell .gura-auth-brand .auth-logo{width:185px;height:75px}
+.app-shell .gura-auth-brand .auth-logo img{filter:drop-shadow(0 1px 6px rgba(255,255,255,.16))}
+.app-shell .gura-auth-brand .auth-welcome-copy{margin:40px 0;max-width:420px}
+.app-shell .gura-auth-brand .auth-kicker{color:#93c5fd;font-size:12px;letter-spacing:.15em}
+.app-shell .gura-auth-brand .auth-welcome-copy h1{color:#fff;font:700 clamp(32px,3.2vw,45px)/1.13 "Inter",sans-serif;letter-spacing:-.045em;margin:18px 0 20px}
+.app-shell .gura-auth-brand .auth-welcome-copy>p:not(.auth-kicker){color:#cbd5e1;font-size:15px;line-height:1.75;max-width:370px}
+.gura-auth-trust{margin-top:28px;display:flex;align-items:center;gap:12px;color:#bfdbfe;font-size:13px;font-weight:600}
+.gura-auth-trust svg{flex:none;color:#34d399}
+.gura-auth-brand-footer{color:#94a3b8;font-size:12px}
+.app-shell .gura-auth-card{align-self:center;margin:0;padding:42px clamp(24px,4vw,52px);width:100%;height:auto;max-width:none;background:#fff;border:0;border-radius:0;box-shadow:none;backdrop-filter:none}
+.app-shell .gura-auth-card .eyebrow{font-size:11px;color:#2563eb;letter-spacing:.12em;margin:0 0 12px}
+.app-shell .gura-auth-card h1{font:700 clamp(26px,2.4vw,34px)/1.2 "Inter",sans-serif;color:#0f172a;letter-spacing:-.04em;margin:0 0 10px}
+.app-shell .gura-auth-card .muted-text{color:#64748b;font-size:14px;line-height:1.6}
+.app-shell .gura-auth-card form{display:grid;gap:16px;margin-top:23px}
+.app-shell .gura-auth-card label{display:grid;gap:7px;color:#334155;font-size:13px;font-weight:650}
+.app-shell .gura-auth-card input,.app-shell .gura-auth-card select{border:1px solid #cbd5e1;background:#fff;border-radius:10px;color:#0f172a;font-size:14px;padding:13px 14px;min-height:47px;width:100%;box-shadow:none}
+.app-shell .gura-auth-card input:focus,.app-shell .gura-auth-card select:focus{outline:2px solid #2563eb;outline-offset:1px;border-color:#2563eb}
+.gura-password-field{position:relative;display:flex;align-items:center}
+.app-shell .gura-auth-card .gura-password-field input{padding-right:52px}
+.app-shell .gura-auth-card .gura-password-toggle{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:42px;height:42px;display:grid;place-items:center;border:0;background:transparent;color:#64748b;cursor:pointer;border-radius:8px}
+.app-shell .gura-auth-card .gura-password-toggle:hover{color:#2563eb;background:#eff6ff}
+.app-shell .gura-auth-card .gura-password-toggle:focus-visible{outline:2px solid #2563eb;outline-offset:1px}
+.gura-role-context{margin:24px 0 6px}
+.gura-context-label{display:block;font-weight:650;color:#334155;font-size:12px;margin-bottom:10px}
+.gura-role-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.app-shell .gura-role-option{border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:9px;min-height:40px;padding:8px 6px;font:600 11px "Inter",sans-serif;cursor:pointer}
+.app-shell .gura-role-option.selected{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
+.app-shell .gura-role-option:focus-visible{outline:2px solid #2563eb;outline-offset:1px}
+.gura-role-context small,.gura-auth-field-note{display:block;color:#64748b;font-size:11px;line-height:1.5}
+.gura-role-context small{margin-top:8px}
+.app-shell .gura-auth-card .gura-auth-field-note{margin:-12px 0 -3px;color:#64748b}
+.app-shell .gura-auth-card .gura-auth-submit{min-height:49px;margin-top:4px;font:700 14px "Inter",sans-serif;background:#2563eb;color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:9px}
+.app-shell .gura-auth-card .gura-auth-submit:hover:not(:disabled){background:#1d4ed8}
+.app-shell .gura-auth-card .gura-auth-submit:disabled{opacity:.75;cursor:wait}
+.gura-spin{animation:gura-spin 1s linear infinite}
+@keyframes gura-spin{to{transform:rotate(360deg)}}
+.gura-auth-error{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;color:#991b1b;font-size:12px;line-height:1.5}
+.gura-auth-error svg{flex:none}
+.gura-mfa-notice{display:flex;gap:9px;align-items:flex-start;color:#64748b;font-size:11px;line-height:1.6;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;margin:18px 0 0}
+.gura-mfa-notice svg{flex:none;margin-top:1px;color:#2563eb}
+.app-shell .gura-auth-card .switch-auth{margin-top:20px;color:#64748b;font-size:13px}
+.app-shell .gura-auth-card .switch-auth a{color:#2563eb;font-weight:700}
+@media(max-width:780px){
+  .app-shell .gura-auth-page{min-height:calc(100vh - 130px);padding:26px 16px 42px}
+  .app-shell .gura-auth-layout{display:block;max-width:490px;min-height:0;background:#fff;border-radius:18px}
+  .app-shell .gura-auth-brand{display:none}
+  .app-shell .gura-auth-card{margin:0;max-width:none;padding:32px 24px 28px;border:0;border-radius:0}
+}
+@media(max-width:400px){.gura-role-options{gap:5px}.app-shell .gura-role-option{font-size:10px;padding:6px 3px}}
+@media(prefers-reduced-motion:reduce){.gura-spin{animation:none}}
