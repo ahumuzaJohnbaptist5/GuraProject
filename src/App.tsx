@@ -106,7 +106,7 @@ function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; 
 function Directory({ user }: { user: User | null }) {
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q") || ""); const [location, setLocation] = useState(() => searchParams.get("location") || ""); const [filter, setFilter] = useState<"all" | ListingType>(() => (["technician","shop","seller"].includes(searchParams.get("type") || "") ? searchParams.get("type") as ListingType : "all")); const [sort, setSort] = useState<"relevance" | "rating">("relevance"); const [favoritesOnly, setFavoritesOnly] = useState(false); const [selected, setSelected] = useState<Listing | null>(null); const [sent, setSent] = useState(false); const [reported, setReported] = useState(false); const [favorites, setFavorites] = useState<string[]>(user ? listFavorites(user.id) : []);
-  const listings = useMemo(() => listListings().filter((listing) => (listing.moderationStatus || "approved") === "approved" && (!favoritesOnly || favorites.includes(listing.id)) && (filter === "all" || listing.type === filter) && (!location || listing.location.toLowerCase().includes(location.toLowerCase())) && `${listing.name} ${listing.location} ${listing.services.join(" ")}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => sort === "rating" ? getListingRating(b) - getListingRating(a) : 0), [query, location, filter, sort, favoritesOnly, favorites]);
+  const listings = useMemo(() => listListings().filter((listing) => (listing.moderationStatus || "approved") === "approved" && (!favoritesOnly || favorites.includes(listing.id)) && (filter === "all" || listing.type === filter) && (!location || listing.location.toLowerCase().includes(location.toLowerCase())) && `${listing.name} ${listing.location} ${listing.text} ${listing.services.join(" ")}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => sort === "rating" ? getListingRating(b) - getListingRating(a) : 0), [query, location, filter, sort, favoritesOnly, favorites]);
   const sendRequest = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!user || !selected) return; const data = new FormData(event.currentTarget); createRequest({ id: crypto.randomUUID(), customerId: user.id, listingId: selected.id, providerId: selected.ownerId, title: String(data.get("title")), details: String(data.get("details")), preferredDate: String(data.get("preferredDate") || ""), preferredTime: String(data.get("preferredTime") || ""), status: "open", createdAt: new Date().toISOString() }); setSelected(null); setSent(true); setTimeout(() => setSent(false), 3000); };
   const favorite = (listingId: string) => { if (!user) return; setFavorites(toggleFavorite(user.id, listingId)); };
   const claimListing = (listing: Listing) => { if (!user || (user.role !== "technician" && user.role !== "shop") || listing.ownerId) return; const expectedType: ListingType = user.role === "shop" ? "shop" : "technician"; if (listing.type !== expectedType) return; updateListing(listing.id, { ownerId: user.id }); setSelected({ ...listing, ownerId: user.id }); };
@@ -224,14 +224,40 @@ function NotificationPanel({ user }: { user: User }) {
 function ListingManager({ user, listings, onChange }: { user: User; listings: Listing[]; onChange: () => void }) {
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<string | null>(null); const [form, setForm] = useState({ name: "", location: "", availability: "", text: "", services: "" }); const type: ListingType = user.role === "shop" ? "shop" : "technician";
   if (user.role !== "technician" && user.role !== "shop") return null;
-  const submit = (event: React.FormEvent) => { event.preventDefault(); createListing({ id: crypto.randomUUID(), ownerId: user.id, name: form.name, type, location: form.location, availability: form.availability, text: form.text, services: form.services.split(",").map((item) => item.trim()).filter(Boolean), verified: false, rating: 0, moderationStatus: "pending" }); setForm({ name: "", location: "", availability: "", text: "", services: "" }); setOpen(false); onChange(); };
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      await createListing({ id: crypto.randomUUID(), ownerId: user.id, name: form.name, type, location: form.location, availability: form.availability, text: form.text, services: form.services.split(",").map((item) => item.trim()).filter(Boolean), verified: false, rating: 0, moderationStatus: "pending" });
+      setForm({ name: "", location: "", availability: "", text: "", services: "" });
+      setOpen(false);
+      onChange();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to save listing.");
+    } finally {
+      setSaving(false);
+    }
+  };
   const own = listings.filter((listing) => listing.ownerId === user.id);
-  const saveAvailability = (listing: Listing, availability: string) => { updateListing(listing.id, { availability }); setEditing(null); onChange(); };
-  return <section className="panel listing-manager"><div className="panel-title"><div><p className="eyebrow">Your storefront</p><h2>Listings</h2></div><button className="button small" onClick={() => setOpen(!open)}>{open ? "Close" : "Add listing"}</button></div>{open && <form className="listing-form" onSubmit={submit}><label>Listing name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Northside Device Lab" /></label><label>Location<input required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. East district" /></label><label>Availability<input value={form.availability} onChange={(e) => setForm({ ...form, availability: e.target.value })} placeholder="Weekdays · 09:00–17:00" /></label><label>What do you offer?<textarea required rows={3} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} /></label><label>Services <small>comma separated</small><input required value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} placeholder="Screen repair, Diagnostics" /></label><button className="button">Submit for review</button></form>}{own.length ? own.map((listing) => <div className="listing-owner-card" key={listing.id}><div className="admin-row"><span><b>{listing.name}</b><small>{listing.location} · {listing.moderationStatus || "approved"}</small>{editing === listing.id ? <input className="availability-edit" aria-label={`Availability for ${listing.name}`} defaultValue={listing.availability || ""} onKeyDown={(event) => { if (event.key === "Enter") saveAvailability(listing, event.currentTarget.value); }} onBlur={(event) => saveAvailability(listing, event.currentTarget.value)} /> : <small>{listing.availability || "Availability not set"}</small>}</span><span className="listing-row-actions"><span className="tag">{listing.moderationStatus || "approved"}</span><button className="text-button" onClick={() => setEditing(listing.id)}>Edit hours</button></span></div><ListingMediaRoom listing={listing} onChange={onChange} /></div>) : <p className="muted-text">Create a listing to appear in the directory after moderation.</p>}</section>;
+  const saveAvailability = async (listing: Listing, availability: string) => {
+    try {
+      await updateListing(listing.id, { availability });
+      setEditing(null);
+      onChange();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to update hours.");
+    }
+  };
+  return <section className="panel listing-manager"><div className="panel-title"><div><p className="eyebrow">Your storefront</p><h2>Listings</h2></div><button className="button small" onClick={() => setOpen(!open)}>{open ? "Close" : "Add listing"}</button></div>{open && <form className="listing-form" onSubmit={submit}><label>Listing name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Northside Device Lab" /></label><label>Location<input required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. East district" /></label><label>Availability<input value={form.availability} onChange={(e) => setForm({ ...form, availability: e.target.value })} placeholder="Weekdays · 09:00–17:00" /></label><label>What do you offer?<textarea required rows={3} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} /></label><label>Services <small>comma separated</small><input required value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} placeholder="Screen repair, Diagnostics" /></label><button className="button" disabled={saving}>{saving ? "Saving..." : "Submit for review"}</button></form>{error && <p className="error" role="alert">{error}</p>}}{own.length ? own.map((listing) => <div className="listing-owner-card" key={listing.id}><div className="admin-row"><span><b>{listing.name}</b><small>{listing.location} · {listing.moderationStatus || "approved"}</small>{editing === listing.id ? <input className="availability-edit" aria-label={`Availability for ${listing.name}`} defaultValue={listing.availability || ""} onKeyDown={(event) => { if (event.key === "Enter") saveAvailability(listing, event.currentTarget.value); }} onBlur={(event) => saveAvailability(listing, event.currentTarget.value)} /> : <small>{listing.availability || "Availability not set"}</small>}</span><span className="listing-row-actions"><span className="tag">{listing.moderationStatus || "approved"}</span><button className="text-button" onClick={() => setEditing(listing.id)}>Edit hours</button></span></div><ListingMediaRoom listing={listing} onChange={onChange} /></div>) : <p className="muted-text">Create a listing to appear in the directory after moderation.</p>}</section>;
 }
 
 function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const images = listing.images || [];
   const label = listing.type === "shop" ? "Product and storefront images" : "Physical location proof";
   const help = listing.type === "shop" ? "Show products, stock, or the shop front." : "Show the workshop, sign, or physical location customers can visit.";
@@ -239,6 +265,8 @@ function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: (
     const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/") && file.size <= 1_000_000).slice(0, 6 - images.length);
     if (!files.length) return;
     setBusy(true);
+    setError("");
+    setNotice("");
     try {
       const encoded = await Promise.all(files.map((file) => new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -246,20 +274,30 @@ function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: (
         reader.onerror = () => reject(new Error("Unable to read image."));
         reader.readAsDataURL(file);
       })));
-      updateListing(listing.id, { images: [...images, ...encoded] });
+      const saved = await updateListing(listing.id, { images: [...images, ...encoded] });
+      setNotice(saved.moderationStatus === "approved" ? "Images saved and available in the marketplace." : "Images saved. This listing requires administrator approval before appearing in search.");
       onChange();
     } catch (error) {
-      console.error("Unable to add listing images", error);
+      setError(error instanceof Error ? error.message : "Unable to upload images. Please try again.");
     } finally {
       setBusy(false);
       event.target.value = "";
     }
   };
-  const removeImage = (image: string) => {
-    updateListing(listing.id, { images: images.filter((item) => item !== image) });
-    onChange();
+  const removeImage = async (image: string) => {
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      await updateListing(listing.id, { images: images.filter((item) => item !== image) });
+      onChange();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to remove image.");
+    } finally {
+      setBusy(false);
+    }
   };
-  return <div className="media-room"><div className="media-room-heading"><span><strong><ImageIcon size={17} /> {label}</strong><small>{help} Up to 6 images, 1 MB each.</small></span><label className="upload-button"><Upload size={15} /> {busy ? "Reading..." : "Add images"}<input type="file" accept="image/*" multiple disabled={busy || images.length >= 6} onChange={addImages} /></label></div>{images.length ? <div className="media-grid">{images.map((image, index) => <div className="media-item" key={image}><img src={image} alt={`${listing.name} image ${index + 1}`} /><button type="button" aria-label={`Remove image ${index + 1}`} onClick={() => removeImage(image)}><Trash2 size={14} /></button></div>)}</div> : <p className="muted-text">No images uploaded yet. Images help customers and administrators verify the listing.</p>}<small className="media-note">MVP storage: images are kept with the listing record. Move them to Supabase Storage before storing large production galleries.</small></div>;
+  return <div className="media-room"><div className="media-room-heading"><span><strong><ImageIcon size={17} /> {label}</strong><small>{help} Up to 6 images, 1 MB each.</small></span><label className="upload-button"><Upload size={15} /> {busy ? "Reading..." : "Add images"}<input type="file" accept="image/*" multiple disabled={busy || images.length >= 6} onChange={addImages} /></label></div>{images.length ? <div className="media-grid">{images.map((image, index) => <div className="media-item" key={image}><img src={image} alt={`${listing.name} image ${index + 1}`} /><button type="button" aria-label={`Remove image ${index + 1}`} onClick={() => removeImage(image)}><Trash2 size={14} /></button></div>)}</div> : <p className="muted-text">No images uploaded yet. Images help customers and administrators verify the listing.</p>}{error && <p className="error" role="alert">{error}</p>}{notice && <p className="success" role="status">{notice}</p>}{listing.moderationStatus !== "approved" && <p className="muted-text">This listing is {listing.moderationStatus || "pending"} and is not yet visible in public search. An administrator must approve it.</p>}<small className="media-note">MVP storage: images are kept with the listing record. Move them to Supabase Storage before storing large production galleries.</small></div>;
 }
 
 function FavoritesPanel({ user, listings }: { user: User; listings: Listing[] }) {
