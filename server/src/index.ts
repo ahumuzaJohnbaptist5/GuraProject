@@ -623,14 +623,26 @@ const provisionAdministrator = async () => {
     console.warn("Administrator provisioning skipped: provide a valid GURA_ADMIN_EMAIL and a GURA_ADMIN_PASSWORD of 12-128 characters.");
     return;
   }
-  const existing = await query<{ role: string }>(
-    "SELECT role FROM users WHERE lower(email) = $1 LIMIT 1", [email],
+  const existing = await query<{ id: string; role: string; password_hash: string }>(
+    "SELECT id, role, password_hash FROM users WHERE lower(email) = $1 LIMIT 1", [email],
   );
   if (existing.rows.length) {
-    if (existing.rows[0].role !== "administrator") {
+    const account = existing.rows[0];
+    if (account.role !== "administrator") {
       console.warn("Administrator provisioning skipped: email already belongs to a non-administrator. Choose a different private email.");
+      return;
     }
-    return; // Never overwrite an existing user's role or password at startup.
+    // Render credentials are the source of truth for this privately provisioned administrator.
+    // Synchronize only when the password changes, so redeploys preserve active sessions.
+    if (await verifyPassword(password, account.password_hash)) {
+      console.log("Private GURA administrator credentials verified.");
+      return;
+    }
+    const passwordHash = await hashPassword(password);
+    await query("UPDATE users SET password_hash = $1 WHERE id = $2 AND role = 'administrator'", [passwordHash, account.id]);
+    await query("DELETE FROM sessions WHERE user_id = $1", [account.id]);
+    console.log("Private GURA administrator password synchronized; previous sessions revoked.");
+    return;
   }
   const passwordHash = await hashPassword(password);
   const created = await query(
@@ -640,6 +652,7 @@ const provisionAdministrator = async () => {
     [email, passwordHash],
   );
   if (created.rowCount) console.log("Private GURA administrator account provisioned.");
+  else console.warn("Administrator provisioning skipped due to an existing conflicting account.");
 };
 
 void provisionAdministrator()
