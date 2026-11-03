@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download, Heart, Image as ImageIcon, LogOut, Menu, MessageCircle, RotateCcw, Search, ShieldCheck, Star, Store, Trash2, Upload, Wrench, X, MapPin, HardDrive, Cpu, Monitor, Plug, Eye, EyeOff, LockKeyhole, LoaderCircle } from "lucide-react";
-import auth from "./auth";
+import auth, { requestPasswordReset, completePasswordReset } from "./auth";
 import { confirmRequestDate, createAuditEvent, createListing, createMessage, createReport, createRequest, createReview, domainAdapter, exportDomainData, getListingRating, hydrateDomain, listAuditEvents, listFavorites, listListings, listMessages, listNotifications, listReports, listRequests, listReviews, markNotificationsRead, resetDomainData, toggleFavorite, updateListing, updateListingStatus, updateReportStatus, updateRequest } from "./data";
 import type { Listing, ListingType, Role, ServiceRequest, User } from "./types";
 
@@ -197,12 +197,83 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
             {loading ? "Please wait…" : mode === "login" ? "Sign In to GURA" : "Create GURA Account"}
           </button>
         </form>
+        {mode === "login" && <Link className="gura-forgot-link" to="/forgot-password">Forgot your password?</Link>}
         <p className="switch-auth">{mode === "login" ? <>New to GURA? <Link to="/register">Create an account</Link></> : <>Already registered? <Link to="/login">Sign in</Link></>}</p>
         <p className="gura-auth-footnote"><ShieldCheck size={14}/> Secure connection · Email sign-in is supported; phone sign-in is planned.</p>
       </div></div><div className="gura-laptop-base" aria-hidden="true"><span className="gura-laptop-trackpad"/></div></div></div>
     </div>
   </main>;
 }
+function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true); setError("");
+    try {
+      await requestPasswordReset(email.trim());
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not process request. Try again.");
+    } finally { setSubmitting(false); }
+  };
+  return <main className="container gura-recovery-page">
+    <div className="gura-recovery-card">
+      <div className="gura-recovery-icon"><LockKeyhole size={25}/></div>
+      <h1>Forgot your password?</h1>
+      <p className="muted-text">Enter the email address linked to your GURA account. We'll email a secure reset link if the account exists.</p>
+      {done ? <div className="gura-recovery-success" role="status"><CheckCircle2 size={20}/><span>If that email belongs to a GURA account, a password reset link will be sent. Check your inbox and spam folder.</span></div> :
+        <form onSubmit={submit}><label>Email address<input type="email" autoComplete="email" required placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} /></label>
+          {error && <p className="error" role="alert">{error}</p>}
+          <button className="button full" disabled={submitting}>{submitting && <LoaderCircle size={17} className="gura-spinner"/>}{submitting ? "Sending…" : "Send Reset Link"}</button>
+        </form>}
+      <Link className="gura-recovery-back" to="/login">Back to Sign In</Link>
+    </div>
+  </main>;
+}
+
+function ResetPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const validToken = /^[a-f0-9]{64}$/i.test(token);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); if (submitting) return;
+    setError("");
+    if (password.length < 12) { setError("Use at least 12 characters."); return; }
+    if (password !== confirm) { setError("Passwords do not match."); return; }
+    setSubmitting(true);
+    try { await completePasswordReset(token, password); setDone(true); setPassword(""); setConfirm(""); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not reset password."); }
+    finally { setSubmitting(false); }
+  };
+  return <main className="container gura-recovery-page">
+    <div className="gura-recovery-card">
+      <div className="gura-recovery-icon"><ShieldCheck size={25}/></div>
+      <h1>{done ? "Password updated" : "Create a new password"}</h1>
+      {done ? <><p className="gura-recovery-success" role="status">Your password has been changed. For security, existing sessions have been signed out.</p><Link className="button full" to="/login">Sign In to GURA</Link></> :
+       !validToken ? <><p className="error" role="alert">This reset link is invalid. Request a new link to continue.</p><Link className="button full" to="/forgot-password">Request New Link</Link></> :
+       <><p className="muted-text">Choose a strong new password of at least 12 characters.</p>
+        <form onSubmit={submit}>
+          <label>New password<input required type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={12} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/></label>
+          <label>Confirm new password<input required type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={12} maxLength={128} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>
+          <label className="gura-recovery-show"><input type="checkbox" checked={showPassword} onChange={e=>setShowPassword(e.target.checked)}/> Show passwords</label>
+          {error && <p className="error" role="alert">{error}</p>}
+          <button type="submit" className="button full" disabled={submitting}>{submitting && <LoaderCircle className="gura-spinner" size={17}/>} {submitting ? "Updating…" : "Set New Password"}</button>
+        </form></>}
+      <Link className="gura-recovery-back" to="/login">Back to Sign In</Link>
+    </div>
+  </main>;
+}
+
 function Protected({ user, children }: { user: User | null; children: React.ReactNode }) { return user ? <>{children}</> : <Navigate to="/login" replace />; }
 
 function RequestCard({ request, user, listings, onChange }: { request: ServiceRequest; user: User; listings: Listing[]; onChange: () => void }) {
@@ -304,4 +375,4 @@ function Dashboard({ user, onUserUpdate }: { user: User; onUserUpdate: (user: Us
   return <main className="container page"><div className="dashboard-head"><div><p className="eyebrow">{roleLabels[user.role]} dashboard</p><h1>Hello, {user.name.split(" ")[0]}.</h1><p className="lede narrow">{descriptions[user.role]}</p></div><span className="role-pill">{roleLabels[user.role]}</span></div><div className="dashboard-grid"><section className="panel"><h2>Complete your profile</h2><p className="muted-text">A clear profile helps the right people find you.</p><form onSubmit={save}><label>Name<input required value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /></label><label>Location<input placeholder="e.g. Central district" value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} /></label><label>About you<textarea rows={4} placeholder="What should people know?" value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} /></label>{saved && <p className="success" role="status">Profile saved.</p>}<button className="button">Save changes</button></form></section>  <section className="panel accent-panel"><p className="eyebrow">Phase 15 handoff readiness</p><h2>{allRequests.length ? `${allRequests.length} request${allRequests.length === 1 ? "" : "s"} in your workspace` : "Your request inbox is ready."}</h2><p>Coordinate preferred times, propose alternatives, and keep appointment updates visible in one place.</p><div className="roadmap"><span>01</span>Request a time<small>Available</small><span>02</span>Propose a slot<small>Available</small><span>03</span>Confirm together<small>Available</small></div></section></div><div className="metric-grid">{metricCards.map((metric) => <div className="metric-card" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>  <NotificationPanel user={user} /><FavoritesPanel user={user} listings={listings} /><ListingManager user={user} listings={listings} onChange={() => setRefresh((value) => value + 1)} />{user.role === "administrator" && <AdminUsersPanel currentUser={user} onChange={() => setRefresh((value) => value + 1)} />}<section className="panel requests-panel"><div className="panel-title"><div><p className="eyebrow">Requests & conversations</p><h2>{user.role === "customer" ? "Your requests" : "Your assigned requests"}</h2></div><div className="panel-controls"><select aria-label="Filter requests" value={requestFilter} onChange={(e) => setRequestFilter(e.target.value as typeof requestFilter)}><option value="all">All statuses</option><option value="open">Open</option><option value="accepted">Accepted</option><option value="completed">Completed</option><option value="declined">Declined</option><option value="cancelled">Cancelled</option></select><Link className="text-link" to="/directory">Find more help</Link></div></div>{requests.length ? requests.map((request) => <RequestCard key={`${request.id}-${refresh}`} request={request} user={user} listings={listings} onChange={() => setRefresh((value) => value + 1)} />) : <div className="empty-state compact"><ClipboardList size={25} /><p>No requests match this filter.</p></div>}</section>{user.role === "administrator" && <><section className="panel"><div className="panel-title"><div><p className="eyebrow">Admin tools</p><h2>Listing moderation</h2></div></div>{listings.filter((listing) => (listing.moderationStatus || "approved") === "pending").map((listing) => <div className="admin-row" key={listing.id}><span><b>{listing.name}</b><small>{listingLabels[listing.type]} · {listing.location}</small></span><span className="request-actions"><button onClick={() => { updateListingStatus(listing.id, "approved"); setRefresh((value) => value + 1); }}>Approve</button><button onClick={() => { updateListingStatus(listing.id, "rejected"); setRefresh((value) => value + 1); }}>Reject</button></span></div>)}<p className="muted-text">Moderation is illustrative in this local MVP and must be enforced server-side in production.</p>  </section><section className="panel"><div className="panel-title"><div><p className="eyebrow">Trust & safety</p><h2>Listing reports</h2></div><span className="count-pill">{reports.length}</span></div>{reports.length ? reports.map((report) => <div className="admin-row" key={report.id}><span><b>{listings.find((listing) => listing.id === report.listingId)?.name || "Unknown listing"}</b><small>{report.reason} · {report.details}</small></span><span className="request-actions"><button onClick={() => { updateReportStatus(report.id, "resolved"); createAuditEvent({ id: crypto.randomUUID(), actorId: user.id, action: "Resolved listing report", target: report.listingId, details: report.reason, createdAt: new Date().toISOString() }); setRefresh((value) => value + 1); }}>Resolve</button>  <button onClick={() => { updateReportStatus(report.id, "dismissed"); createAuditEvent({ id: crypto.randomUUID(), actorId: user.id, action: "Dismissed listing report", target: report.listingId, details: report.reason, createdAt: new Date().toISOString() }); setRefresh((value) => value + 1); }}>Dismiss</button></span></div>) : <p className="muted-text">No open listing reports.</p>}</section><AuditPanel/></>}</main>;
 }
 
-export default function App() { const [user, setUser] = useState<User | null>(() => auth.getCurrentUser()); const [dataVersion, setDataVersion] = useState(0); useEffect(() => { hydrateDomain().then(() => setDataVersion((value) => value + 1)).catch((error) => console.error("Unable to hydrate API domain data", error)); }, [user]); const logout = async () => { await auth.logout(); setUser(null); }; return <Layout user={user} onLogout={logout}><Routes key={dataVersion}><Route path="/" element={<FreshHome />} /><Route path="/directory" element={<Directory user={user} />} /><Route path="/login" element={user ? <Navigate to="/dashboard" /> : <AuthPage mode="login" onAuth={setUser} />} /><Route path="/register" element={user ? <Navigate to="/dashboard" /> : <AuthPage mode="register" onAuth={setUser} />} /><Route path="/dashboard" element={<Protected user={user}>{user && <Dashboard user={user} onUserUpdate={setUser} />}</Protected>} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></Layout>; }
+export default function App() { const [user, setUser] = useState<User | null>(() => auth.getCurrentUser()); const [dataVersion, setDataVersion] = useState(0); useEffect(() => { hydrateDomain().then(() => setDataVersion((value) => value + 1)).catch((error) => console.error("Unable to hydrate API domain data", error)); }, [user]); const logout = async () => { await auth.logout(); setUser(null); }; return <Layout user={user} onLogout={logout}><Routes key={dataVersion}><Route path="/" element={<FreshHome />} /><Route path="/directory" element={<Directory user={user} />} /><Route path="/login" element={user ? <Navigate to="/dashboard" /> : <AuthPage mode="login" onAuth={setUser} />} /><Route path="/forgot-password" element={<ForgotPasswordPage/>}/><Route path="/reset-password" element={<ResetPasswordPage/>}/><Route path="/register" element={user ? <Navigate to="/dashboard" /> : <AuthPage mode="register" onAuth={setUser} />} /><Route path="/dashboard" element={<Protected user={user}>{user && <Dashboard user={user} onUserUpdate={setUser} />}</Protected>} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></Layout>; }
