@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download, Heart, Image as ImageIcon, LogOut, Menu, MessageCircle, RotateCcw, Search, ShieldCheck, Star, Store, Trash2, Upload, Wrench, X, MapPin, HardDrive, Cpu, Monitor } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download, Heart, Image as ImageIcon, LogOut, Menu, MessageCircle, RotateCcw, Search, ShieldCheck, Star, Store, Trash2, Upload, Wrench, X, MapPin, HardDrive, Cpu, Monitor, Eye, EyeOff, LockKeyhole, LoaderCircle } from "lucide-react";
 import auth from "./auth";
 import { confirmRequestDate, createAuditEvent, createListing, createMessage, createReport, createRequest, createReview, domainAdapter, exportDomainData, getListingRating, hydrateDomain, listAuditEvents, listFavorites, listListings, listMessages, listNotifications, listReports, listRequests, listReviews, markNotificationsRead, resetDomainData, toggleFavorite, updateListing, updateListingStatus, updateReportStatus, updateRequest } from "./data";
 import type { Listing, ListingType, Role, ServiceRequest, User } from "./types";
@@ -78,9 +78,93 @@ function Directory({ user }: { user: User | null }) {
 }
 
 function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user: User) => void }) {
-  const navigate = useNavigate(); const [error, setError] = useState(""); const [loading, setLoading] = useState(false); const [form, setForm] = useState({ name: "", email: "", password: "", role: "customer" as Role });
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(""); if (form.password.length < 8) { setError("Use a password with at least 8 characters."); return; } setLoading(true); try { const user = mode === "login" ? await auth.login({ email: form.email, password: form.password }) : await auth.register({ id: crypto.randomUUID(), name: form.name, email: form.email, role: form.role }, form.password); onAuth(user); navigate("/dashboard"); } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); } finally { setLoading(false); } };
-  return <main className="auth-page"><div className="auth-aurora" aria-hidden="true" /><div className="auth-layout"><section className="auth-welcome"><Link className="auth-logo" to="/" aria-label="Gura home"><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></Link><div className="auth-welcome-copy"><p className="auth-kicker">A better way to get unstuck</p><h1>{mode === "login" ? "WELCOME BACK!" : "WELCOME!"}</h1><p>Join Gura and connect with trusted people, useful electronics, and honest support.</p><Link className="auth-learn-more" to="/directory">Learn more <ArrowRight size={17} /></Link></div><div className="auth-socials" aria-label="Social links"><span>◎</span><span>f</span><span>𝕏</span></div></section><div className="auth-card"><p className="eyebrow">{mode === "login" ? "Welcome back" : "Start your Gura profile"}</p><h1>{mode === "login" ? "Sign in" : "Create an account"}</h1><p className="muted-text">{mode === "login" ? "Continue where you left off." : "Choose the role that best describes how you use Gura."}</p><form onSubmit={submit}>{mode === "register" && <><label>Full name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>Role<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>{Object.entries(roleLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></>}<label>Email<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label><label>Password<input required type="password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>{error && <p className="error" role="alert">{error}</p>}<button className="button full" disabled={loading}>{loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create profile"}</button></form><p className="switch-auth">{mode === "login" ? <>New to Gura? <Link to="/register">Create an account</Link></> : <>Already have an account? <Link to="/login">Sign in</Link></>}</p></div></div></main>;
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [roleContext, setRoleContext] = useState<"technician" | "supplier" | "administrator">("technician");
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "customer" as Role });
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loading) return;
+    setError("");
+    if (mode === "register" && form.password.length < 8) {
+      setError("Use a password with at least 8 characters.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const user = mode === "login"
+        ? await auth.login({ email: form.email.trim(), password: form.password })
+        : await auth.register({ id: crypto.randomUUID(), name: form.name, email: form.email.trim(), role: form.role }, form.password);
+      onAuth(user);
+      navigate("/dashboard");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      // Do not reveal whether an email address is registered or which credential failed.
+      const isCredentialError = mode === "login" && /incorrect|invalid|credentials|password is incorrect/i.test(message);
+      setError(isCredentialError ? "Invalid email or password. Please try again." : message || "Unable to sign in. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return <main className="auth-page gura-auth-page">
+    <div className="auth-layout gura-auth-layout">
+      <section className="auth-welcome gura-auth-brand">
+        <Link className="auth-logo" to="/" aria-label="GURA APP home"><img src="/gura-logo.png" alt="GURA APP" /></Link>
+        <div className="auth-welcome-copy">
+          <p className="auth-kicker">GURA APP • Regional parts network</p>
+          <h1>Secure Regional Marketplace for Computer Parts</h1>
+          <p>Find parts, connect with trusted local businesses, and manage your work from one place.</p>
+          <Link className="gura-auth-explore" to="/directory">Explore marketplace <ArrowRight size={17}/></Link>
+        </div>
+        <div className="gura-auth-trust"><ShieldCheck size={18}/><span>Built for technicians, repair shops and suppliers</span></div>
+      </section>
+      <div className="auth-card gura-auth-card">
+        <p className="eyebrow">{mode === "login" ? "Welcome back" : "Join the GURA network"}</p>
+        <h1>{mode === "login" ? "Sign in to GURA" : "Create your account"}</h1>
+        <p className="muted-text">{mode === "login" ? "Enter your account credentials to continue." : "Tell us a little about yourself to get started."}</p>
+        {mode === "login" && <div className="gura-role-context">
+          <p className="gura-field-title">I am signing in as</p>
+          <div className="gura-role-options" role="group" aria-label="Sign-in role context">
+            {([["technician","Technician"],["supplier","Supplier / Shop"],["administrator","Admin"]] as const).map(([value,label]) =>
+              <button type="button" key={value} aria-pressed={roleContext === value} className={roleContext === value ? "gura-role-option selected" : "gura-role-option"} onClick={() => setRoleContext(value)}>{label}</button>
+            )}
+          </div>
+          <p className="gura-role-note">Your actual access is determined securely by your account, not this selection.</p>
+        </div>}
+        <form onSubmit={submit} className="gura-login-form">
+          {mode === "register" && <>
+            <label>Full name<input required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}/></label>
+            <label>Account type<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
+              <option value="customer">Customer / Buyer</option><option value="technician">Technician</option><option value="shop">Supplier / Repair Shop</option>
+            </select></label>
+          </>}
+          <label>Email address<input required type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com"/></label>
+          <label>Password
+            <span className="gura-password-field">
+              <input required type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 8 : undefined} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Enter your password"/>
+              <button type="button" className="gura-password-toggle" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
+                {showPassword ? <EyeOff size={19}/> : <Eye size={19}/>}
+              </button>
+            </span>
+          </label>
+          {mode === "login" && roleContext === "administrator" && <div className="gura-mfa-reserved" aria-label="Planned administrator verification">
+            <div><LockKeyhole size={17}/><strong>Admin verification</strong><span className="gura-planned-badge">Planned</span></div>
+            <p>A 6-digit verification step will be added when server-side MFA is implemented. It is not required or active yet.</p>
+            <input type="text" aria-label="Future six-digit verification code" placeholder="••••••" inputMode="numeric" maxLength={6} disabled/>
+          </div>}
+          {error && <div className="gura-auth-error" role="alert"><AlertTriangle size={18}/><span>{error}</span></div>}
+          <button className="button full gura-auth-submit" type="submit" disabled={loading} aria-busy={loading}>
+            {loading && <LoaderCircle size={18} className="gura-spinner" aria-hidden="true"/>}
+            {loading ? "Please wait…" : mode === "login" ? "Sign In to GURA" : "Create GURA Account"}
+          </button>
+        </form>
+        <p className="switch-auth">{mode === "login" ? <>New to GURA? <Link to="/register">Create an account</Link></> : <>Already registered? <Link to="/login">Sign in</Link></>}</p>
+        <p className="gura-auth-footnote"><ShieldCheck size={14}/> Secure connection · Email sign-in is supported; phone sign-in is planned.</p>
+      </div>
+    </div>
+  </main>;
 }
 function Protected({ user, children }: { user: User | null; children: React.ReactNode }) { return user ? <>{children}</> : <Navigate to="/login" replace />; }
 
