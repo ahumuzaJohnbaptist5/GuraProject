@@ -420,3 +420,22 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell .marketplace-outline-link,
 .app-shell .verified:hover { color:#c2410c; }
 .app-shell .button,.app-shell .gura-auth-submit,.app-shell .gura-laptop .gura-auth-submit { color:#ffffff; }
+
+
+/* Solid navy landing hero, matched to the supplied color reference. */
+.app-shell .gura-landing-hero {
+  background: #0f2847;
+  border-color: #254565;
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 40, 71, 0.12);
+}
+.app-shell .gura-landing-hero h1 { color: #ffffff; }
+.app-shell .gura-landing-hero > p:not(.gura-landing-disclaimer),
+.app-shell .gura-landing-hero .gura-landing-disclaimer { color: #dbe7f4; }
+.app-shell .gura-landing-hero .gura-landing-kicker {
+  background: #203d5b;
+  border-color: #44627e;
+  color: #fbbf77;
+}
+.app-shell .gura-landing-hero .gura-landing-kicker span { background: #f59e0b; }
+.app-shell .gura-landing-hero .gura-landing-search { background: #ffffff; }
