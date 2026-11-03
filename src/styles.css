@@ -21,3 +21,69 @@
 .slot-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .appointment-editor{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#f2f0e8;border-radius:8px;padding:12px;margin:14px 0}.appointment-editor small{grid-column:1/-1;color:#718079;font-size:12px}
 @media(max-width:760px){.metric-grid{grid-template-columns:repeat(2,1fr)}.directory-tools{flex-wrap:wrap}.directory-tools .search-field{flex-basis:100%}.panel-controls{align-items:flex-end;flex-direction:column;gap:8px}}
+
+
+/* GURA light-only presentation. This is the single supported visual theme. */
+:root { color-scheme: light; }
+.app-shell { background:#f8fafc; color:#172b3a; }
+.app-shell .site-header { background:#fff; border-bottom:1px solid #dce5ec; }
+.app-shell .brand,.app-shell .nav,.app-shell .footer-inner strong { color:#172b3a; }
+.app-shell .nav a:hover,.app-shell .nav-logout:hover { color:#176eb2; }
+.app-shell footer { background:#edf3f7; border-top:1px solid #dce5ec; color:#506477; }
+.app-shell .fresh-home,.app-shell .fresh-hero,.app-shell .fresh-section,.app-shell .page,.app-shell .auth-page { background:#f8fafc; }
+.app-shell .fresh-hero:before { background:linear-gradient(100deg,#dceeff,#f5e9ff 60%,transparent 90%); opacity:.65; }
+.app-shell .fresh-hero:after { background:#edf3f7; }
+.app-shell .fresh-hero h1,.app-shell .fresh-section-heading h2,.app-shell .fresh-join h2,
+.app-shell .page h1,.app-shell .auth-card h1 { color:#172b3a; }
+.app-shell .fresh-hero-copy>p:not(.eyebrow),.app-shell .fresh-section-heading>p,.app-shell .fresh-feature p,
+.app-shell .lede,.app-shell .muted-text,.app-shell .listing p,.app-shell .panel p { color:#56697a; }
+.app-shell .fresh-kicker { background:#e9f1ff; color:#2458a8; border-color:#c4d7f5; }
+.app-shell .fresh-proof,.app-shell .fresh-device-footer,.app-shell .fresh-device-top { color:#576b7d; }
+.app-shell .fresh-quiet-link,.app-shell .text-button,.app-shell .switch-auth a { color:#2458a8; }
+.app-shell .fresh-device-card,.app-shell .fresh-float,.app-shell .listing,.app-shell .panel,
+.app-shell .metric-card,.app-shell .feature,.app-shell .modal { background:#fff; color:#172b3a; border:1px solid #dce5ec; box-shadow:0 12px 32px #203c5712; }
+.app-shell .fresh-device-screen { background:linear-gradient(145deg,#e9f2ff,#f8efff); border-color:#dce5ec; }
+.app-shell .fresh-float small,.app-shell .listing small,.app-shell .feature p,.app-shell .panel p,
+.app-shell .notification small,.app-shell .muted-text { color:#657789; }
+.app-shell .fresh-float-icon,.app-shell .fresh-feature-icon { background:#e9f1ff; color:#3362ad; }
+.app-shell .fresh-avatar { background:#f9e6ef; color:#a34672; }
+.app-shell .fresh-strip { background:#edf3f7; border-color:#dce5ec; }
+.app-shell .fresh-section .fresh-feature { border-top-color:#dce5ec; }
+.app-shell .fresh-feature-top { color:#637487; }
+.app-shell .fresh-join { background:linear-gradient(105deg,#e9f1ff,#fcecf4); border-top:1px solid #dce5ec; }
+.app-shell .fresh-join .eyebrow { color:#9f416c; }
+.app-shell .light-button { background:#fff; color:#172b3a; box-shadow:0 5px 16px #203c5716; }
+.app-shell .light-button:hover { background:#edf3f7; }
+.app-shell .listing h3,.app-shell .panel h2,.app-shell .feature h3,
+.app-shell .metric-card strong,.app-shell .empty-state h2 { color:#172b3a; }
+.app-shell .tag { background:#e9f1ff; color:#2458a8; }
+.app-shell .directory-tools select,.app-shell input,.app-shell select,.app-shell textarea,.app-shell .search-field,
+.app-shell .auth-card input,.app-shell .auth-card select { background:#fff; border-color:#ccd8e1; color:#172b3a; }
+.app-shell input::placeholder,.app-shell textarea::placeholder { color:#718495; }
+.app-shell label,.app-shell .auth-card label { color:#405568; }
+.app-shell .service-chips span,.app-shell .availability,.app-shell .message-thread,
+.app-shell .review-list blockquote,.app-shell .empty-state { background:#eff4f8; color:#475e70; border-color:#dce5ec; }
+.app-shell .filter-button,.app-shell .favorite,.app-shell .upload-button,
+.app-shell .request-actions button,.app-shell .admin-users-panel button { background:#fff; color:#2458a8; border-color:#ccd8e1; }
+.app-shell .filter-button.active { background:#e9f1ff; color:#2458a8; border-color:#7299d3; }
+.app-shell .modal-backdrop { background:#172b3a99; }
+.app-shell .modal-close { color:#506477; }
+.app-shell .notification,.app-shell .request-card,.app-shell .admin-row,
+.app-shell .audit-row,.app-shell .favorite-row { border-color:#dce5ec; }
+.app-shell .toast,.app-shell .success { background:#e7f6ed; color:#216b47; }
+.app-shell .error { color:#b42335; }
+.app-shell .auth-page { background:#f8fafc; }
+.auth-aurora { background:linear-gradient(90deg,#c7e7ff,#f5d8e5 55%,#ffebcb); opacity:.38; }
+.auth-layout { background:#fff; border:1px solid #dce5ec; box-shadow:0 24px 60px #203c571a; }
+.auth-logo,.auth-welcome-copy h1 { color:#172b3a; }
+.auth-kicker,.auth-welcome-copy>p:not(.auth-kicker),.auth-card .eyebrow,
+.auth-card .switch-auth,.auth-card .muted-text { color:#657789; }
+.auth-learn-more { background:linear-gradient(105deg,#2861b9,#527bc4); color:#fff; box-shadow:0 10px 22px #2861b933; }
+.auth-socials { color:#516a83; }
+.app-shell .auth-card { background:#fff; border:1px solid #dce5ec; box-shadow:0 16px 42px #203c5714; }
+.app-shell .auth-card .switch-auth a { color:#2458a8; }
+.app-shell .auth-logo img { filter:none; }
+@media(max-width:760px) {
+  .app-shell .site-header,.app-shell .nav { background:#fff; }
+  .app-shell .nav { box-shadow:0 10px 22px #203c571a; }
+}
