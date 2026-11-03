@@ -473,3 +473,73 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
   background: #1e4165;
   border: 1px solid #456586;
 }
+
+
+/* Dedicated GURA role-based account profile */
+.app-shell .gura-profile-page{max-width:1200px;padding-top:34px;padding-bottom:85px;color:#12233b}
+.gura-profile-breadcrumb{display:flex;gap:12px;align-items:center;font-size:12px;color:#718096;margin-bottom:28px}
+.gura-profile-breadcrumb a:hover{color:#c2410c}
+.gura-profile-breadcrumb strong{color:#213754}
+.gura-profile-header{display:flex;align-items:flex-end;justify-content:space-between;gap:22px;margin-bottom:26px}
+.gura-profile-header h1{margin:0 0 12px;font:700 clamp(32px,4vw,46px)/1.1 "Space Grotesk",sans-serif;color:#142b49;letter-spacing:-.045em}
+.gura-profile-header p:not(.eyebrow){max-width:620px;line-height:1.65;color:#66758b;margin:0}
+.gura-profile-back{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#365676;white-space:nowrap}
+.gura-profile-back svg{transform:rotate(180deg)}
+.gura-profile-hero{background:#0f2847;border-radius:19px;padding:31px 34px;display:flex;align-items:center;gap:26px;color:#fff;box-shadow:0 15px 35px #112b471c;margin-bottom:26px}
+.gura-profile-avatar{width:86px;height:86px;flex:none;display:grid;place-items:center;border-radius:22px;background:#e9a84c;color:#102942;font:700 29px "Space Grotesk",sans-serif;letter-spacing:-.05em}
+.gura-profile-identity{flex:1;min-width:0}
+.gura-profile-identity h2{color:#fff;font:700 28px "Space Grotesk",sans-serif;letter-spacing:-.03em;margin:9px 0 4px;overflow-wrap:anywhere}
+.gura-profile-identity>p{margin:0;color:#d1dfee;font-size:14px;overflow-wrap:anywhere}
+.gura-profile-role{display:inline-flex;border-radius:30px;padding:5px 10px;background:#284767;color:#ffca82;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.gura-profile-meta{display:flex;flex-wrap:wrap;gap:13px;margin-top:16px;color:#bcd0e5;font-size:12px}
+.gura-profile-meta span{display:inline-flex;align-items:center;gap:6px}
+.gura-profile-completeness{width:220px;flex:none;border-left:1px solid #ffffff30;padding-left:26px}
+.gura-profile-completeness>span{display:block;font-size:12px;color:#c8d9eb;margin-bottom:7px}
+.gura-profile-completeness>strong{font-size:26px;display:block;margin-bottom:8px}
+.gura-profile-progress{height:7px;background:#385674;border-radius:999px;overflow:hidden}
+.gura-profile-progress span{display:block;height:100%;background:#edaa4a;border-radius:999px}
+.gura-profile-completeness small{display:block;color:#bed2e5;font-size:11px;line-height:1.5;margin-top:9px}
+.gura-profile-feedback{margin:0 0 16px;padding:12px 15px;border-radius:9px;background:#e9f7ee}
+.gura-profile-feedback.error{background:#fdf0ed}
+.gura-profile-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:22px;align-items:start}
+.gura-profile-card{background:#fff;border:1px solid #e1e8f0;border-radius:17px;padding:27px;box-shadow:0 5px 23px #10294208;min-width:0}
+.gura-profile-card h2{color:#132a46;font:700 19px "Space Grotesk",sans-serif;margin:0 0 15px}
+.gura-profile-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:1px solid #edf0f5;padding-bottom:24px}
+.gura-profile-card-header h2{margin:0 0 7px}
+.gura-profile-card-header p{font-size:12px;color:#708096;line-height:1.6;margin:0}
+.gura-profile-edit,.gura-profile-cancel{border:1px solid #d3deeb;border-radius:9px;background:#fff;padding:10px 14px;color:#234b72;font:700 12px "Inter",sans-serif;display:inline-flex;gap:8px;align-items:center;cursor:pointer;white-space:nowrap}
+.gura-profile-edit:hover,.gura-profile-cancel:hover{background:#eff5fb}
+.gura-profile-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:25px 26px;padding-top:25px}
+.gura-profile-details>div{display:flex;flex-direction:column;gap:7px;min-width:0}
+.gura-profile-details span,.gura-profile-security div>span{font-size:12px;color:#738196}
+.gura-profile-details strong,.gura-profile-security div>strong{font-size:14px;color:#142b49;font-weight:650;overflow-wrap:anywhere}
+.gura-profile-details small{font-size:11px;color:#8895a8}
+.gura-profile-details .gura-profile-bio{grid-column:1/-1;padding-top:18px;border-top:1px solid #edf0f5}
+.gura-profile-bio p{white-space:pre-wrap;line-height:1.7;font-size:14px;color:#394c66;margin:3px 0 0}
+.gura-profile-form{display:grid;gap:21px;padding-top:22px}
+.gura-profile-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.gura-profile-form label{color:#2a405b}
+.gura-profile-form input,.gura-profile-form textarea{width:100%;border-color:#d4deeb}
+.gura-profile-form label small{justify-self:end;color:#8390a2;font-weight:400}
+.gura-profile-form-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.gura-profile-sidebar{display:grid;gap:20px;min-width:0}
+.gura-profile-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.gura-profile-stats>div{display:flex;flex-direction:column;gap:8px;border-radius:11px;padding:14px 12px;background:#f3f7fb;min-width:0}
+.gura-profile-stats strong{color:#16385c;font-size:24px}
+.gura-profile-stats span{font-size:11px;color:#64758a}
+.gura-profile-action-link{display:inline-flex;align-items:center;gap:8px;margin-top:20px;color:#b45309;font-weight:700;font-size:13px}
+.gura-profile-tips{padding:0;margin:0;list-style:none;display:grid;gap:15px}
+.gura-profile-tips li{display:flex;align-items:flex-start;gap:10px;color:#50627a;line-height:1.5;font-size:13px}
+.gura-profile-tips svg{flex:none;color:#148267}
+.gura-profile-security h2{display:flex;align-items:center;gap:8px}
+.gura-profile-security div{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:14px 0}
+.gura-profile-security div>strong{text-align:right}
+.gura-profile-security p{color:#708096;font-size:12px;line-height:1.6;border-top:1px solid #edf0f5;margin:17px 0 0;padding-top:15px}
+.gura-dashboard-profile-banner{border-radius:16px;background:#0f2847;color:#fff;padding:23px 26px;display:flex;align-items:center;gap:20px;margin:10px 0 27px}
+.gura-dashboard-profile-banner h2{font:700 19px "Space Grotesk",sans-serif;color:#fff;margin:0 0 6px}
+.gura-dashboard-profile-banner p{font-size:13px;color:#c7d9ec;margin:0;line-height:1.5}
+.gura-dashboard-profile-banner>div:nth-child(2){flex:1}
+.gura-dashboard-profile-icon{width:48px;height:48px;flex:none;border-radius:12px;background:#254765;color:#f2b65e;display:grid;place-items:center}
+.gura-dashboard-profile-banner .button{white-space:nowrap}
+@media(max-width:900px){.gura-profile-grid{grid-template-columns:1fr}.gura-profile-sidebar{grid-template-columns:repeat(2,minmax(0,1fr))}.gura-profile-security{grid-column:1/-1}}
+@media(max-width:640px){.app-shell .gura-profile-page{padding-top:22px;padding-bottom:55px}.gura-profile-header{display:block}.gura-profile-back{margin-top:18px}.gura-profile-hero{padding:23px;flex-wrap:wrap;gap:18px}.gura-profile-avatar{width:64px;height:64px;border-radius:16px;font-size:23px}.gura-profile-identity h2{font-size:22px}.gura-profile-completeness{width:100%;border-left:0;border-top:1px solid #ffffff30;padding:17px 0 0}.gura-profile-card{padding:21px}.gura-profile-card-header{flex-wrap:wrap}.gura-profile-details,.gura-profile-form-grid,.gura-profile-sidebar{grid-template-columns:1fr}.gura-profile-security{grid-column:auto}.gura-profile-details .gura-profile-bio{grid-column:auto}.gura-dashboard-profile-banner{flex-wrap:wrap;padding:22px}.gura-dashboard-profile-banner .button{width:100%}}
