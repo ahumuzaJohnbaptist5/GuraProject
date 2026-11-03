@@ -543,3 +543,68 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .gura-dashboard-profile-banner .button{white-space:nowrap}
 @media(max-width:900px){.gura-profile-grid{grid-template-columns:1fr}.gura-profile-sidebar{grid-template-columns:repeat(2,minmax(0,1fr))}.gura-profile-security{grid-column:1/-1}}
 @media(max-width:640px){.app-shell .gura-profile-page{padding-top:22px;padding-bottom:55px}.gura-profile-header{display:block}.gura-profile-back{margin-top:18px}.gura-profile-hero{padding:23px;flex-wrap:wrap;gap:18px}.gura-profile-avatar{width:64px;height:64px;border-radius:16px;font-size:23px}.gura-profile-identity h2{font-size:22px}.gura-profile-completeness{width:100%;border-left:0;border-top:1px solid #ffffff30;padding:17px 0 0}.gura-profile-card{padding:21px}.gura-profile-card-header{flex-wrap:wrap}.gura-profile-details,.gura-profile-form-grid,.gura-profile-sidebar{grid-template-columns:1fr}.gura-profile-security{grid-column:auto}.gura-profile-details .gura-profile-bio{grid-column:auto}.gura-dashboard-profile-banner{flex-wrap:wrap;padding:22px}.gura-dashboard-profile-banner .button{width:100%}}
+
+
+/* Compact profile refinement: group related information and remove scattered whitespace. */
+.app-shell .gura-profile-page{padding-top:22px;padding-bottom:48px}
+.app-shell .gura-profile-breadcrumb{margin-bottom:14px;gap:8px}
+.app-shell .gura-profile-header{margin-bottom:16px;gap:16px;align-items:center}
+.app-shell .gura-profile-header .eyebrow{margin-bottom:8px}
+.app-shell .gura-profile-header h1{font-size:clamp(28px,3.3vw,38px);margin-bottom:7px}
+.app-shell .gura-profile-header p:not(.eyebrow){font-size:13px;line-height:1.45}
+.app-shell .gura-profile-hero{padding:20px 24px;gap:18px;margin-bottom:16px;border-radius:14px;box-shadow:0 6px 20px #112b4712}
+.app-shell .gura-profile-avatar{width:66px;height:66px;border-radius:15px;font-size:24px}
+.app-shell .gura-profile-identity h2{font-size:23px;margin:5px 0 3px}
+.app-shell .gura-profile-identity>p{font-size:12px}
+.app-shell .gura-profile-role{padding:4px 9px;font-size:10px}
+.app-shell .gura-profile-meta{gap:10px;margin-top:9px;font-size:11px}
+.app-shell .gura-profile-completeness{width:195px;padding-left:18px}
+.app-shell .gura-profile-completeness>span{margin-bottom:3px}
+.app-shell .gura-profile-completeness>strong{font-size:22px;margin-bottom:6px}
+.app-shell .gura-profile-completeness small{margin-top:6px;line-height:1.35}
+.app-shell .gura-profile-grid{gap:14px;grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr)}
+.app-shell .gura-profile-card{padding:18px 20px;border-radius:13px;box-shadow:0 2px 12px #10294207}
+.app-shell .gura-profile-card h2{font-size:17px;margin-bottom:10px}
+.app-shell .gura-profile-card-header{gap:10px;align-items:center;padding-bottom:14px}
+.app-shell .gura-profile-card-header h2{margin:0 0 4px}
+.app-shell .gura-profile-card-header p{line-height:1.4}
+.app-shell .gura-profile-details{gap:14px 18px;padding-top:16px}
+.app-shell .gura-profile-details>div{gap:4px}
+.app-shell .gura-profile-details .gura-profile-bio{padding-top:12px}
+.app-shell .gura-profile-bio p{line-height:1.5;margin-top:2px}
+.app-shell .gura-profile-form{gap:13px;padding-top:15px}
+.app-shell .gura-profile-form-grid{gap:12px}
+.app-shell .gura-profile-form textarea{min-height:90px}
+.app-shell .gura-profile-form-actions{gap:8px}
+.app-shell .gura-profile-sidebar{gap:13px}
+.app-shell .gura-profile-stats{gap:8px}
+.app-shell .gura-profile-stats>div{padding:10px;gap:4px;border-radius:9px}
+.app-shell .gura-profile-stats strong{font-size:21px}
+.app-shell .gura-profile-action-link{margin-top:12px}
+.app-shell .gura-profile-tips{gap:9px}
+.app-shell .gura-profile-tips li{gap:8px;line-height:1.4;font-size:12px}
+.app-shell .gura-profile-security div{margin:9px 0;gap:8px}
+.app-shell .gura-profile-security p{padding-top:11px;margin-top:11px;line-height:1.45}
+.app-shell .gura-dashboard-profile-banner{padding:16px 20px;gap:13px;margin:6px 0 17px;border-radius:13px}
+.app-shell .gura-dashboard-profile-banner h2{font-size:17px;margin-bottom:3px}
+.app-shell .gura-dashboard-profile-icon{width:42px;height:42px}
+@media(max-width:900px){
+  .app-shell .gura-profile-grid{grid-template-columns:1fr}
+  .app-shell .gura-profile-sidebar{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .app-shell .gura-profile-security{grid-column:1/-1}
+}
+@media(max-width:640px){
+  .app-shell .gura-profile-page{padding-top:15px;padding-bottom:35px}
+  .app-shell .gura-profile-header{margin-bottom:14px}
+  .app-shell .gura-profile-hero{padding:16px;gap:12px;margin-bottom:12px}
+  .app-shell .gura-profile-avatar{width:54px;height:54px;font-size:20px}
+  .app-shell .gura-profile-identity h2{font-size:20px}
+  .app-shell .gura-profile-completeness{width:100%;padding:12px 0 0}
+  .app-shell .gura-profile-grid{gap:11px}
+  .app-shell .gura-profile-card{padding:16px}
+  .app-shell .gura-profile-details,.app-shell .gura-profile-form-grid,.app-shell .gura-profile-sidebar{grid-template-columns:1fr}
+  .app-shell .gura-profile-details{gap:12px}
+  .app-shell .gura-profile-details .gura-profile-bio{grid-column:auto}
+  .app-shell .gura-profile-security{grid-column:auto}
+  .app-shell .gura-dashboard-profile-banner{padding:15px;gap:10px}
+}
