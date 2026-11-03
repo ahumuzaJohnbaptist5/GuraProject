@@ -4,7 +4,9 @@ const USERS_KEY = "gura-users";
 const SESSION_KEY = "gura-session";
 
 type StoredUser = User & { password: string };
-const API_URL = import.meta.env.VITE_API_URL as string | undefined;
+// Production always uses the real API; local-only demo accounts are development-only.
+const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const API_URL = (configuredApiUrl || (import.meta.env.PROD ? "https://gura-api-272p.onrender.com" : undefined))?.replace(/\/+$/, "");
 const useApi = Boolean(API_URL);
 
 const readUsers = (): StoredUser[] => {
