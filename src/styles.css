@@ -302,3 +302,29 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
  .app-shell .gura-laptop .gura-auth-card{max-width:none;width:100%;padding:30px 24px;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 8px 24px #0f172a12}
 }
 @media(max-width:400px){.app-shell .gura-laptop .gura-auth-card{padding:26px 18px}.app-shell .gura-laptop .gura-auth-card h1{font-size:23px}}
+
+
+/* Contrast repair: override earlier light-theme auth-welcome rule on desktop.
+   Keep the right login form light and the mobile layout unchanged. */
+@media (min-width:821px) {
+  .app-shell .gura-auth-layout .auth-welcome.gura-reference-brand {
+    background:radial-gradient(circle at 25% 5%,#123158 0%,#0b1d32 60%,#081729 100%);
+    color:#ffffff;
+  }
+  .app-shell .gura-auth-layout .gura-reference-brand .auth-welcome-copy h1 {
+    color:#ffffff;
+  }
+  .app-shell .gura-auth-layout .gura-reference-brand .auth-welcome-copy h1 span {
+    color:#f9bd4a;
+  }
+  .app-shell .gura-auth-layout .gura-reference-brand .auth-kicker,
+  .app-shell .gura-auth-layout .gura-reference-brand .gura-auth-benefits li {
+    color:#f1f5f9;
+  }
+  .app-shell .gura-auth-layout .gura-reference-brand .gura-auth-benefits li small {
+    color:#c0d0e4;
+  }
+  .app-shell .gura-auth-layout .gura-reference-brand .gura-auth-trust {
+    color:#cbd5e1;
+  }
+}
