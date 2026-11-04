@@ -116,6 +116,7 @@ CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at);
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, created_at);
 
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS image_urls TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS location_images TEXT[] NOT NULL DEFAULT '{}';
 
 DELETE FROM listings
 WHERE id IN (
