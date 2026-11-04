@@ -7,6 +7,7 @@ export type User = {
   role: Role;
   location?: string;
   bio?: string;
+  locationImages?: string[];
   verified?: boolean;
   suspended?: boolean;
 };
