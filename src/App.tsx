@@ -334,15 +334,45 @@ function ProfileMediaSection({ user, onUserUpdate }: { user: User; onUserUpdate:
     const selected = Array.from(files || []);
     if (!selected.length) return [];
     if (selected.length > room) throw new Error(`Only ${room} more photo(s) can be added to this gallery.`);
-    if (selected.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 1_000_000)) {
-      throw new Error("Use JPEG, PNG, or WebP photos smaller than 1 MB each.");
+    if (selected.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8_000_000)) {
+      throw new Error("Use JPEG, PNG or WebP photos smaller than 8 MB each.");
     }
-    return Promise.all(selected.map((file) => new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error("Unable to read the selected photo."));
-      reader.onload = () => resolve(String(reader.result));
-      reader.readAsDataURL(file);
-    })));
+    // Resize camera originals before saving: base64 images are stored in the database
+    // and mirrored in the browser cache. Keeping files small avoids quota failures.
+    return Promise.all(selected.map(async (file) => {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const img = new Image();
+        img.src = objectUrl;
+        await img.decode();
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 1100 / Math.max(img.naturalWidth, img.naturalHeight));
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Image resizing is unavailable in this browser.");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        let encoded = canvas.toDataURL("image/jpeg", 0.78);
+        for (let attempt = 0; encoded.length > 280_000 && attempt < 5; attempt += 1) {
+          const resized = document.createElement("canvas");
+          resized.width = Math.max(1, Math.round(canvas.width * 0.8));
+          resized.height = Math.max(1, Math.round(canvas.height * 0.8));
+          const nextContext = resized.getContext("2d");
+          if (!nextContext) break;
+          nextContext.drawImage(canvas, 0, 0, resized.width, resized.height);
+          canvas.width = resized.width;
+          canvas.height = resized.height;
+          context.drawImage(resized, 0, 0);
+          encoded = canvas.toDataURL("image/jpeg", Math.max(0.48, 0.72 - attempt * 0.06));
+        }
+        if (encoded.length > 350_000) throw new Error("This photo is too complex to compress. Try a smaller image.");
+        return encoded;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }));
   };
 
   const saveLocation = async (next: string[]) => {
@@ -404,7 +434,7 @@ function ProfileMediaSection({ user, onUserUpdate }: { user: User; onUserUpdate:
         </> : <div className="gura-media-no-listing"><p>Create a shop or technician listing first, then upload its product or service photos here.</p><Link className="button small" to="/dashboard">Create a listing <ArrowRight size={15}/></Link></div>}
       </div>
     </div>
-    <p className="gura-profile-media-footnote">JPEG, PNG or WebP, maximum 1 MB per photo. Images are saved with your account or listing record; avoid uploading personal documents or sensitive details.</p>
+    <p className="gura-profile-media-footnote">JPEG, PNG or WebP, up to 8 MB per source photo (resized automatically). Images are saved with your account or listing record; avoid uploading personal documents or sensitive details.</p>
   </section>;
 }
 
