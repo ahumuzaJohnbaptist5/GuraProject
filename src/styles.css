@@ -819,3 +819,42 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
     white-space: normal;
   }
 }
+
+
+/* Separate provider profile premises gallery from public marketplace listing photos. */
+.app-shell .gura-profile-media-section { margin-top:17px; }
+.app-shell .gura-profile-media-heading { margin-bottom:12px; }
+.app-shell .gura-profile-media-heading .eyebrow { margin:0 0 4px; }
+.app-shell .gura-profile-media-heading h2 { margin:0 0 5px; font:700 21px "Space Grotesk",sans-serif; color:#15314e; }
+.app-shell .gura-profile-media-heading p:not(.eyebrow) { margin:0; color:#60728b; font-size:13px; line-height:1.5; }
+.app-shell .gura-profile-media-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:14px; }
+.app-shell .gura-profile-media-card { display:flex; flex-direction:column; gap:13px; min-height:250px; }
+.app-shell .gura-media-card-title { display:flex; gap:11px; align-items:start; }
+.app-shell .gura-media-card-title>svg { flex:none; color:#c56b16; margin-top:2px; }
+.app-shell .gura-media-card-title h3 { margin:0 0 5px; color:#132c49; font-size:16px; line-height:1.35; }
+.app-shell .gura-media-card-title p { margin:0; color:#65768c; font-size:12px; line-height:1.55; }
+.app-shell .gura-media-gallery { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+.app-shell .gura-media-thumb { position:relative; border-radius:10px; aspect-ratio:1; overflow:hidden; border:1px solid #dce6ef; background:#f2f6f9; }
+.app-shell .gura-media-thumb img { width:100%; height:100%; display:block; object-fit:cover; }
+.app-shell .gura-media-thumb button { position:absolute; top:5px; right:5px; border:0; background:#0f2847df; color:white; width:29px; height:29px; display:grid; place-items:center; border-radius:8px; cursor:pointer; }
+.app-shell .gura-media-thumb button:disabled { opacity:.45; cursor:not-allowed; }
+.app-shell .gura-media-empty { grid-column:1/-1; margin:0; border:1px dashed #c9d8e7; color:#71829a; padding:18px 12px; font-size:12px; border-radius:10px; background:#f8fafc; }
+.app-shell .gura-media-bottom { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:auto; }
+.app-shell .gura-media-bottom>span { color:#6c7b90; font-size:12px; }
+.app-shell .gura-media-bottom .upload-button { color:#b8530d; font-weight:700; font-size:12px; padding:10px 13px; }
+.app-shell .gura-media-picker { font-size:12px; display:grid; gap:6px; font-weight:650; color:#3a5470; }
+.app-shell .gura-media-picker select { min-height:39px; width:100%; }
+.app-shell .gura-media-listing-status { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; font-size:12px; }
+.app-shell .gura-media-listing-status b { color:#344c69; overflow-wrap:anywhere; }
+.app-shell .gura-media-no-listing { display:grid; gap:10px; }
+.app-shell .gura-media-no-listing p { font-size:13px; line-height:1.5; color:#64748b; margin:0; }
+.app-shell .gura-media-no-listing .button { width:max-content; display:inline-flex; gap:7px; align-items:center; }
+.app-shell .gura-profile-media-footnote { font-size:11px; color:#78889d; margin:10px 0 0; line-height:1.5; }
+@media (max-width:780px) {
+  .app-shell .gura-profile-media-grid { grid-template-columns:1fr; gap:11px; }
+  .app-shell .gura-profile-media-card { min-height:0; }
+}
+@media (max-width:430px) {
+  .app-shell .gura-media-gallery { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .app-shell .gura-media-bottom .upload-button { width:100%; justify-content:center; min-height:43px; }
+}
