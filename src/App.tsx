@@ -325,7 +325,7 @@ function ProfileMediaSection({ user, onUserUpdate }: { user: User; onUserUpdate:
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState("");
-  const [version, setVersion] = useState(0);
+  const [, setVersion] = useState(0);
   const ownListings = listListings().filter((listing) => listing.ownerId === user.id);
   const current = ownListings.find((listing) => listing.id === selectedId) || ownListings[0];
   const locationImages = user.locationImages || [];
