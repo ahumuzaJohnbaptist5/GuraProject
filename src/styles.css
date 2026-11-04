@@ -741,3 +741,81 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
   .app-shell .metric-grid {gap:8px}
   .app-shell .metric-card {padding:11px 12px}
 }
+
+
+/* Dashboard density — empty cards should not look like full content sections. */
+.app-shell .dashboard-empty-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(190px, 1.45fr);
+  align-items: center;
+  column-gap: 18px;
+  padding: 12px 20px;
+  min-height: 0;
+  margin-top: 10px;
+}
+.app-shell .dashboard-empty-panel .panel-title {
+  align-items: center;
+  margin: 0;
+  gap: 8px;
+  min-width: 0;
+}
+.app-shell .dashboard-empty-panel .panel-title .eyebrow {
+  margin: 0 0 3px;
+  font-size: 10px;
+}
+.app-shell .dashboard-empty-panel .panel-title h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.2;
+}
+.app-shell .dashboard-empty-panel > p.muted-text {
+  margin: 0;
+  line-height: 1.4;
+  font-size: 12px;
+}
+.app-shell .dashboard-empty-panel .text-link {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.app-shell .dashboard-empty-panel.favorites-panel {
+  grid-template-columns: minmax(160px,1fr) minmax(210px,1.4fr);
+}
+.app-shell .dashboard-empty-panel.favorites-panel .panel-title {
+  display: contents;
+}
+.app-shell .dashboard-empty-panel.favorites-panel .panel-title > div {
+  grid-column: 1;
+  grid-row: 1;
+}
+.app-shell .dashboard-empty-panel.favorites-panel .panel-title .text-link {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: start;
+}
+.app-shell .dashboard-empty-panel.favorites-panel > p.muted-text {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+.app-shell .admin-users-panel .panel-title,
+.app-shell .audit-panel .panel-title {
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .app-shell .dashboard-empty-panel,
+  .app-shell .dashboard-empty-panel.favorites-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    padding: 13px 15px;
+  }
+  .app-shell .dashboard-empty-panel.favorites-panel .panel-title {
+    display: flex;
+  }
+  .app-shell .dashboard-empty-panel .panel-title {
+    justify-content: space-between;
+  }
+  .app-shell .dashboard-empty-panel .panel-title .text-link {
+    white-space: normal;
+  }
+}
