@@ -244,8 +244,8 @@ function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: (
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const images = listing.images || [];
-  const label = listing.type === "shop" ? "Product and storefront images" : "Physical location proof";
-  const help = listing.type === "shop" ? "Show products, stock, or the shop front." : "Show the workshop, sign, or physical location customers can visit.";
+  const label = listing.type === "shop" ? "Marketplace product photos" : "Marketplace service photos";
+  const help = listing.type === "shop" ? "Show products and stock. Add shop-front photos under My Profile instead." : "Show completed repair work and services. Add premises photos under My Profile instead.";
   const addImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/") && file.size <= 1_000_000).slice(0, 6 - images.length);
     if (!files.length) return;
@@ -318,6 +318,96 @@ function DemoDataPanel() {
   return <section className="panel demo-data-panel"><div className="panel-title"><div><p className="eyebrow">Developer handoff</p><h2>Local data controls</h2></div><span className="tag">Local only</span></div><p className="muted-text">Export the current domain snapshot before replacing this adapter with a server API. Reset removes marketplace records but keeps registered accounts.</p><div className="request-actions"><button onClick={download}><Download size={15} /> Export JSON</button><button onClick={reset}><RotateCcw size={15} /> Reset domain data</button></div></section>;
 }
 
+
+/** Profile galleries deliberately keep premises photos separate from public listing media. */
+function ProfileMediaSection({ user, onUserUpdate }: { user: User; onUserUpdate: (user: User) => void }) {
+  const [busy, setBusy] = useState<"location" | "marketplace" | null>(null);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [version, setVersion] = useState(0);
+  const ownListings = listListings().filter((listing) => listing.ownerId === user.id);
+  const current = ownListings.find((listing) => listing.id === selectedId) || ownListings[0];
+  const locationImages = user.locationImages || [];
+
+  const readImages = async (files: FileList | null, room: number) => {
+    const selected = Array.from(files || []);
+    if (!selected.length) return [];
+    if (selected.length > room) throw new Error(`Only ${room} more photo(s) can be added to this gallery.`);
+    if (selected.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 1_000_000)) {
+      throw new Error("Use JPEG, PNG, or WebP photos smaller than 1 MB each.");
+    }
+    return Promise.all(selected.map((file) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Unable to read the selected photo."));
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsDataURL(file);
+    })));
+  };
+
+  const saveLocation = async (next: string[]) => {
+    setBusy("location"); setError(""); setNotice("");
+    try {
+      const updated = await auth.saveProfile({ locationImages: next });
+      onUserUpdate(updated);
+      setNotice("Premises photos saved to your private account profile. They are not published in marketplace listings.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save premises photos.");
+    } finally { setBusy(null); }
+  };
+  const addLocation = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const photos = await readImages(event.target.files, 4 - locationImages.length);
+      if (photos.length) await saveLocation([...locationImages, ...photos]);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not read photos."); }
+    event.target.value = "";
+  };
+
+  const saveMarketplace = async (next: string[]) => {
+    if (!current) return;
+    setBusy("marketplace"); setError(""); setNotice("");
+    try {
+      const updated = await updateListing(current.id, { images: next });
+      setVersion((value) => value + 1);
+      setNotice(updated.moderationStatus === "approved"
+        ? "Marketplace gallery saved. Images are visible with your approved listing."
+        : "Gallery saved. An administrator must approve the updated listing before these images appear in marketplace search.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save marketplace photos.");
+    } finally { setBusy(null); }
+  };
+  const addMarketplace = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const photos = await readImages(event.target.files, 6 - (current?.images?.length || 0));
+      if (photos.length) await saveMarketplace([...(current?.images || []), ...photos]);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not read photos."); }
+    event.target.value = "";
+  };
+
+  return <section className="gura-profile-media-section" aria-label="Profile and marketplace photos">
+    <div className="gura-profile-media-heading"><div><p className="eyebrow">Your images</p><h2>Manage your photos</h2><p>Choose where each image belongs. Premises photos stay in your account profile; product and work photos belong to marketplace listings.</p></div></div>
+    {error && <p role="alert" className="error gura-profile-feedback">{error}</p>}
+    {notice && <p role="status" className="success gura-profile-feedback">{notice}</p>}
+    <div className="gura-profile-media-grid">
+      <div className="gura-profile-card gura-profile-media-card">
+        <div className="gura-media-card-title"><MapPin size={20}/><div><h3>Location &amp; premises photos</h3><p>Photos of your shop front, workplace, or physical location. Visible only in your account profile, never in the marketplace gallery.</p></div></div>
+        <div className="gura-media-gallery">{locationImages.length ? locationImages.map((src, index) => <div className="gura-media-thumb" key={index}><img src={src} alt={`Your premises image ${index + 1}`}/><button type="button" aria-label={`Remove premises photo ${index + 1}`} disabled={busy !== null} onClick={() => void saveLocation(locationImages.filter((_, i) => i !== index))}><Trash2 size={14}/></button></div>) : <p className="gura-media-empty">No premises photos uploaded.</p>}</div>
+        <div className="gura-media-bottom"><span>{locationImages.length} / 4 photos</span><label className="upload-button"><Upload size={15}/>{busy === "location" ? "Saving..." : "Add premises photos"}<input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy !== null || locationImages.length >= 4} onChange={addLocation}/></label></div>
+      </div>
+      <div className="gura-profile-card gura-profile-media-card">
+        <div className="gura-media-card-title"><Store size={20}/><div><h3>{user.role === "shop" ? "Product photos for marketplace" : "Service &amp; work photos for marketplace"}</h3><p>These photos belong to your selected listing and appear in public marketplace search once the listing is approved.</p></div></div>
+        {current ? <>
+          {ownListings.length > 1 && <label className="gura-media-picker">Choose listing<select value={current.id} onChange={(event) => { setSelectedId(event.target.value); setNotice(""); setError(""); }}>{ownListings.map((listing) => <option key={listing.id} value={listing.id}>{listing.name}</option>)}</select></label>}
+          <p className="gura-media-listing-status"><b>{current.name}</b> <span className="tag">{current.moderationStatus || "pending"}</span></p>
+          <div className="gura-media-gallery">{current.images?.length ? current.images.map((src, index) => <div className="gura-media-thumb" key={index}><img src={src} alt={`Listing photo ${index + 1}`}/><button type="button" aria-label={`Remove listing photo ${index + 1}`} disabled={busy !== null} onClick={() => void saveMarketplace((current.images || []).filter((_, i) => i !== index))}><Trash2 size={14}/></button></div>) : <p className="gura-media-empty">No marketplace photos for this listing.</p>}</div>
+          <div className="gura-media-bottom"><span>{current.images?.length || 0} / 6 photos</span><label className="upload-button"><Upload size={15}/>{busy === "marketplace" ? "Saving..." : "Add marketplace photos"}<input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy !== null || (current.images?.length || 0) >= 6} onChange={addMarketplace}/></label></div>
+        </> : <div className="gura-media-no-listing"><p>Create a shop or technician listing first, then upload its product or service photos here.</p><Link className="button small" to="/dashboard">Create a listing <ArrowRight size={15}/></Link></div>}
+      </div>
+    </div>
+    <p className="gura-profile-media-footnote">JPEG, PNG or WebP, maximum 1 MB per photo. Images are saved with your account or listing record; avoid uploading personal documents or sensitive details.</p>
+  </section>;
+}
+
 function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: User) => void }) {
   const [profile, setProfile] = useState({ name: user.name, location: user.location || "", bio: user.bio || "" });
   const [editing, setEditing] = useState(false);
@@ -329,8 +419,8 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
   const isProvider = user.role === "shop" || user.role === "technician";
   const roleCopy: Record<Role, { title: string; intro: string; bio: string; tips: string[] }> = {
     customer: { title: "My customer profile", intro: "Manage the details used when you connect with local technicians and suppliers.", bio: "Tell service providers what kind of computer support you usually need (optional).", tips: ["Browse nearby computer parts and repair services.", "Track your service requests from the dashboard.", "Save useful suppliers and technicians."] },
-    technician: { title: "My technician profile", intro: "Present yourself professionally so customers understand your expertise and where you work.", bio: "Describe your repair specialties, experience, and the devices you service.", tips: ["Describe your technical specialties and repair experience.", "Maintain your availability and upload workshop photos in Listings.", "Your provider listing becomes searchable after approval."] },
-    shop: { title: "My shop profile", intro: "Build trust with customers looking for computer parts, accessories, and repair shops.", bio: "Introduce your business, product categories, and what makes your shop useful to customers.", tips: ["Add your business location and product categories.", "Manage storefront photos and stock descriptions in Listings.", "Approve-ready listings appear in marketplace search after review."] },
+    technician: { title: "My technician profile", intro: "Present yourself professionally so customers understand your expertise and where you work.", bio: "Describe your repair specialties, experience, and the devices you service.", tips: ["Describe your technical specialties and repair experience.", "Maintain your availability and add work photos to marketplace listings.", "Your listing photos become searchable after approval; premises photos stay on this profile."] },
+    shop: { title: "My shop profile", intro: "Build trust with customers looking for computer parts, accessories, and repair shops.", bio: "Introduce your business, product categories, and what makes your shop useful to customers.", tips: ["Add your business location and product categories.", "Add product photos to marketplace listings and shop-front photos here.", "Approve-ready listings appear in marketplace search after review."] },
     administrator: { title: "My administrator profile", intro: "Keep your account details up to date while managing the GURA marketplace.", bio: "Internal profile notes or administrative responsibilities (optional).", tips: ["Review pending listings and reported content in the dashboard.", "Use a strong private password and keep administrator access restricted.", "Administrator access is determined by your server account role."] },
   };
   const details = roleCopy[user.role];
@@ -371,7 +461,7 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
     {error && <p className="error gura-profile-feedback" role="alert">{error}</p>}
     <div className="gura-profile-grid">
       <section className="gura-profile-card gura-profile-main">
-        <div className="gura-profile-card-header"><div><h2>Personal information</h2><p>Only your name, location and description can be edited here.</p></div>{!editing && <button type="button" className="gura-profile-edit" onClick={() => { setEditing(true); setMessage(""); }}><Wrench size={15}/> Edit profile</button>}</div>
+        <div className="gura-profile-card-header"><div><h2>Personal information</h2><p>Update your details here; manage photos in the separate galleries below.</p></div>{!editing && <button type="button" className="gura-profile-edit" onClick={() => { setEditing(true); setMessage(""); }}><Wrench size={15}/> Edit profile</button>}</div>
         {editing ? <form onSubmit={submit} className="gura-profile-form">
           <div className="gura-profile-form-grid"><label>Full name<input required maxLength={120} autoComplete="name" value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })}/></label><label>{user.role === "shop" ? "Shop location / town" : "Location / town"}<input maxLength={160} autoComplete="address-level2" placeholder="e.g. Kabale, Uganda" value={profile.location} onChange={(event) => setProfile({ ...profile, location: event.target.value })}/></label></div>
           <label>{user.role === "shop" ? "About your business" : user.role === "technician" ? "Professional summary" : "About me"}<textarea maxLength={2000} rows={5} placeholder={details.bio} value={profile.bio} onChange={(event) => setProfile({ ...profile, bio: event.target.value })}/><small>{profile.bio.length}/2000 characters</small></label>
@@ -392,6 +482,7 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
         <section className="gura-profile-card gura-profile-security"><h2><LockKeyhole size={18}/> Account &amp; security</h2><div><span>Sign-in email</span><strong>{user.email}</strong></div><div><span>Account access</span><strong>{roleLabels[user.role]}</strong></div><p>Password changes and additional security options are not available on this profile page yet.</p></section>
       </aside>
     </div>
+    {(user.role === "shop" || user.role === "technician") && <ProfileMediaSection user={user} onUserUpdate={onUserUpdate} />}
   </main>;
 }
 
