@@ -78,7 +78,7 @@ app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, respons
 app.post("/api/auth/login", authRateLimit, asyncRoute(async (request, response) => {
   const input = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(request.body);
   const result = await query<AuthUser & { password_hash: string }>(
-    `SELECT id, name, email, role, location, bio, verified, suspended, password_hash
+    `SELECT id, name, email, role, location, bio, location_images AS "locationImages", verified, suspended, password_hash
      FROM users WHERE email = lower($1)`,
     [input.email],
   );
@@ -108,16 +108,30 @@ app.get("/api/auth/me", asyncRoute(async (request, response) => {
 
 app.patch("/api/auth/me", requireUser, asyncRoute(async (request, response) => {
   const user = response.locals.user as AuthUser;
+  const locationImage = z.string().trim().max(1_500_000).regex(
+    /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+    "Location photos must be JPEG, PNG or WebP images.",
+  );
   const input = z.object({
     name: z.string().trim().min(2).max(120).optional(),
     location: z.string().trim().max(160).nullable().optional(),
     bio: z.string().trim().max(2000).nullable().optional(),
+    locationImages: z.array(locationImage).max(4).optional(),
   }).parse(request.body);
+  if (input.locationImages !== undefined && !["shop", "technician"].includes(user.role)) {
+    response.status(403).json({ error: "Only shops and technicians can upload premises photos." });
+    return;
+  }
   const result = await query<AuthUser>(
-    `UPDATE users SET name = COALESCE($1, name), location = $2, bio = $3
-     WHERE id = $4
-     RETURNING id, name, email, role, location, bio, verified, suspended`,
-    [input.name ?? null, input.location ?? null, input.bio ?? null, user.id],
+    `UPDATE users SET
+        name = COALESCE($1, name),
+        location = COALESCE($2, location),
+        bio = COALESCE($3, bio),
+        location_images = COALESCE($4, location_images)
+      WHERE id = $5
+      RETURNING id, name, email, role, location, bio,
+        location_images AS "locationImages", verified, suspended`,
+    [input.name ?? null, input.location ?? null, input.bio ?? null, input.locationImages ?? null, user.id],
   );
   response.json({ user: result.rows[0] });
 }));
