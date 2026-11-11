@@ -80,20 +80,20 @@ export function CheckoutPage({user}:{user:User|null}){
         method:"POST",body:JSON.stringify({items:lines.map(x=>({productId:x.product.id,quantity:x.entry.quantity})),paymentMethod:method,...(method!=="card"?{phoneNumber:phone}:{})}),
       });
       storeCart([]);
-      if(result.order.status==="demo"){navigate("/orders?demo=1");return;}
+      if(result.order.status==="demo"){window.location.assign("/orders?demo=1");return;}
       if(result.paymentAvailable){
         const pay=await request<{redirectUrl:string}>("/orders/"+result.order.id+"/pay",{method:"POST",body:"{}"});
         window.location.assign(pay.redirectUrl);
         return;
       }
-      navigate("/orders?pending=1");
+      window.location.assign("/orders?pending=1");
     }catch(e){setError(e instanceof Error?e.message:"Checkout was not completed.");}finally{setBusy(false)}
   };
   return <main className="container gura-shop-page"><Link to="/cart" className="gura-shop-back"><ArrowLeft size={16}/> Back to cart</Link><h1>Secure checkout</h1>{loadError&&<p role="alert" className="gura-shop-error">{loadError}</p>}
     {!user&&<div className="gura-shop-warning">Please <Link to="/login">sign in</Link> with a customer account to place your order.</div>}
     {isDemo&&<div className="gura-shop-warning"><ShieldCheck size={19}/> You are checking out demonstration products. No money will be charged. A demo order will appear in your order history and notifications.</div>}
     <div className="gura-cart-layout"><section className="gura-checkout-options"><h2>Choose payment method</h2><label className={method==="mtn"?"active":""}><input type="radio" name="method" checked={method==="mtn"} onChange={()=>setMethod("mtn")}/> <span><b>MTN MoMo Pay</b><small>Authorize payment on your MTN phone</small></span></label><label className={method==="airtel"?"active":""}><input type="radio" name="method" checked={method==="airtel"} onChange={()=>setMethod("airtel")}/> <span><b>Airtel Money</b><small>Authorize payment on your Airtel phone</small></span></label><label className={method==="card"?"active":""}><input type="radio" name="method" checked={method==="card"} onChange={()=>setMethod("card")}/> <span><b>Debit / credit card</b><small>Enter card details only on the secure payment provider page</small></span></label>{method!=="card"&&<div className="gura-checkout-phone"><label htmlFor="gura-payment-phone">Mobile money number</label><input id="gura-payment-phone" type="tel" inputMode="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07XXXXXXXX" autoComplete="tel"/><small>A PIN request will appear through your mobile money provider when live payments are enabled. Never share your PIN with GURA.</small></div>}<p className="gura-shop-note">Live payments use a hosted gateway. We do not collect mobile-money PINs, card numbers or CVVs.</p></section>
-    <aside className="gura-cart-summary"><h2>Checkout summary</h2>{lines.map(x=><p key={x.product.id}>{x.product.name} × {x.entry.quantity}<b>{money(x.product.priceUgx*x.entry.quantity)}</b></p>)}<div className="gura-cart-total">Total <strong>{money(total)}</strong></div>{error&&<p role="alert" className="gura-shop-error">{error}</p>}<button className="gura-shop-primary" disabled={busy||loading||!user||!lines.length||lines.some(x=>x.entry.quantity>x.product.availableUnits)||(method!=="card"&&!/^(?:\+?256|0)7[0-9]{8}$/.test(phone))} onClick={place}>{busy?"Processing...":isDemo?"Place demo order":"Pay securely"} <ArrowRight size={17}/></button><small>Orders remain unpaid until the gateway confirms payment. Listed availability can change before payment is verified.</small></aside></div>
+    <aside className="gura-cart-summary"><h2>Checkout summary</h2>{lines.map(x=><p key={x.product.id}>{x.product.name} × {x.entry.quantity}<b>{money(x.product.priceUgx*x.entry.quantity)}</b></p>)}<div className="gura-cart-total">Total <strong>{money(total)}</strong></div>{error&&<p role="alert" className="gura-shop-error">{error}</p>}<button className="gura-shop-primary" disabled={busy||loading||!user||!lines.length||lines.some(x=>x.entry.quantity>x.product.availableUnits)||(!isDemo&&method!=="card"&&!/^(?:\+?256|0)7[0-9]{8}$/.test(phone))} onClick={place}>{busy?"Processing...":isDemo?"Place demo order":"Pay securely"} <ArrowRight size={17}/></button><small>Orders remain unpaid until the gateway confirms payment. Listed availability can change before payment is verified.</small></aside></div>
   </main>;
 }
 export function OrdersPage({user}:{user:User|null}){
