@@ -153,6 +153,15 @@ const syncPayment = async (trackingId:string) => {
   if (info.merchant_reference!==order.id || info.currency!=="UGX" || Number(info.amount)!==Number(order.amount_ugx)) return;
   const state=String(info.payment_status_description||"").toUpperCase();
   if(state==="COMPLETED") {
+    // Sandbox payments are never recognized as real funds or deducted from live stock.
+    if (process.env.PESAPAL_ENV !== "live") {
+      const test = await query(
+        "UPDATE marketplace_orders SET status='sandbox_paid' WHERE id=$1 AND status='pending_payment' RETURNING id",
+        [order.id],
+      );
+      if (test.rowCount) await createNotification(order.customer_id,"Sandbox payment verified — test only","GURA test order "+order.id.slice(0,8).toUpperCase()+" completed in the payment sandbox. No real money was collected and no stock was deducted.");
+      return;
+    }
     const client=await pool.connect();
     let success=false;
     try {
