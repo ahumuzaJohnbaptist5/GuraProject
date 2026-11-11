@@ -99,9 +99,13 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
-  await createNotification(user.id, status === "demo" ? "Demo order created" : "Order received — payment pending",
-    "Order " + orderId.slice(0,8).toUpperCase() + " (" + total.toLocaleString("en-UG") + " UGX). " +
-    (status === "demo" ? "Sample order only: no payment will be collected and no items will be shipped." : "Your order is awaiting verified payment."));
+  try {
+    await createNotification(user.id, status === "demo" ? "Demo order created" : "Order received — payment pending",
+      "Order " + orderId.slice(0,8).toUpperCase() + " (" + total.toLocaleString("en-UG") + " UGX). " +
+      (status === "demo" ? "Sample order only: no payment will be collected and no items will be shipped." : "Your order is awaiting verified payment."));
+  } catch (error) {
+    console.error("Unable to record order notification", error);
+  }
   res.status(201).json({ order: { id:orderId,status,amountUgx:total }, paymentAvailable:pesapalEnabled && status !== "demo" });
 }));
 
