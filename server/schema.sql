@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS marketplace_products (
 CREATE TABLE IF NOT EXISTS marketplace_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES users(id),
-  status TEXT NOT NULL DEFAULT 'pending_payment' CHECK (status IN ('demo','pending_payment','paid','failed','cancelled')),
+  status TEXT NOT NULL DEFAULT 'pending_payment' CHECK (status IN ('demo','pending_payment','paid','sandbox_paid','failed','cancelled')),
   payment_method TEXT NOT NULL CHECK (payment_method IN ('mtn','airtel','card')),
   phone_number TEXT,
   amount_ugx INTEGER NOT NULL CHECK (amount_ugx > 0),
