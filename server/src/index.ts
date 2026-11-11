@@ -7,6 +7,7 @@ import { createSession, currentUser, destroySession, hashPassword, verifyPasswor
 import { query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
 import { createNotification } from "./notifications.js";
+import { commerceRouter } from "./commerce.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -16,6 +17,7 @@ app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly."));
 app.use(sameOrigin);
 app.use(express.json({ limit: "8mb" }));
 app.use(cookieParser());
+app.use("/api/commerce", commerceRouter);
 
 const asyncRoute = (handler: (request: Request, response: Response) => Promise<void>) =>
   (request: Request, response: Response, next: NextFunction) => handler(request, response).catch(next);
