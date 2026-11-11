@@ -8,11 +8,6 @@ import { createNotification } from "./notifications.js";
 export const commerceRouter = Router();
 const asyncRoute = (handler: (req: Request, res: Response) => Promise<void>) =>
   (req: Request, res: Response, next: NextFunction) => handler(req, res).catch(next);
-const requireCustomer = asyncRoute(async (req, res) => {
-  const user = await currentUser(req);
-  if (!user) { res.status(401).json({ error: "Sign in to continue." }); return; }
-  res.locals.user = user;
-});
 const protect = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await currentUser(req);
