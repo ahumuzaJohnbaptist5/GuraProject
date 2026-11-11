@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle2, CreditCard, Minus, Plus, ShoppingCart, Package, ShieldCheck, X, RefreshCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Minus, Plus, ShoppingCart, Package, ShieldCheck, X, RefreshCcw } from "lucide-react";
 import type { User } from "./types";
 
 export type ShopProduct = {
