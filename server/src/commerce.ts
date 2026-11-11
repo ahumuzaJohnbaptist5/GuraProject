@@ -68,7 +68,6 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
   const combined = new Map<string, number>();
   for (const item of input.items) combined.set(item.productId, (combined.get(item.productId) || 0) + item.quantity);
   if ([...combined.values()].some(qty => qty > 20)) { res.status(400).json({ error: "Maximum 20 units per product." }); return; }
-  if (input.paymentMethod !== "card" && !input.phoneNumber) { res.status(400).json({ error: "Enter the mobile money phone number." }); return; }
   const client = await pool.connect();
   let orderId = "";
   let status = "";
@@ -86,6 +85,7 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
       total += product.price_ugx * qty;
     }
     const demo = found.rows.some(product => product.is_demo);
+    if (!demo && input.paymentMethod !== "card" && !input.phoneNumber) { await client.query("ROLLBACK"); res.status(400).json({ error: "Enter the mobile money phone number." }); return; }
     status = demo ? "demo" : "pending_payment";
     const result = await client.query<{id:string}>(
       "INSERT INTO marketplace_orders(customer_id,status,payment_method,phone_number,amount_ugx) VALUES($1,$2,$3,$4,$5) RETURNING id",
