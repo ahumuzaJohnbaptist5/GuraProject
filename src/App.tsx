@@ -41,59 +41,72 @@ function FreshHome() {
   const [part, setPart] = useState("");
   const [location, setLocation] = useState("");
   const categories = [
-    { title: "Displays & Panels", detail: "Laptop screens and monitors", keyword: "display", icon: <Monitor size={26}/> },
-    { title: "RAM & Memory", detail: "DDR3, DDR4 and DDR5", keyword: "RAM", icon: <Cpu size={26}/> },
-    { title: "Storage Drives", detail: "SSDs and hard drives", keyword: "SSD", icon: <HardDrive size={26}/> },
-    { title: "Power & Cables", detail: "Chargers and adapters", keyword: "power", icon: <Plug size={26}/> },
+    { title: "Laptops & Devices", detail: "Computers, tablets and phones", keyword: "laptop", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=640&q=80" },
+    { title: "RAM & Memory", detail: "DDR3, DDR4 and DDR5", keyword: "RAM", image: "https://images.unsplash.com/photo-1541029071515-84cc54f84dc5?auto=format&fit=crop&w=640&q=80" },
+    { title: "SSDs & Storage", detail: "SSDs, NVMe and hard drives", keyword: "SSD", image: "https://images.unsplash.com/photo-1531492746076-161ca9bcad58?auto=format&fit=crop&w=640&q=80" },
+    { title: "Screens & Displays", detail: "Replacement panels and monitors", keyword: "screen", image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=640&q=80" },
+    { title: "Chargers & Power", detail: "Batteries, adapters and cables", keyword: "charger", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=640&q=80" },
+    { title: "Repair & Tools", detail: "Technicians and repair equipment", keyword: "repair", image: "https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=640&q=80" },
   ];
   const samples = [
-    { name: '14.0" FHD IPS Slim LED Screen (30-Pin)', compatibility: "Fits: HP, Lenovo, Dell", price: "UGX 180,000", condition: "NEW", kind: "screen", icon: <Monitor size={35}/> },
-    { name: "8GB DDR4 3200MHz Laptop RAM SODIMM", compatibility: "Universal DDR4", price: "UGX 85,000", condition: "REFURBISHED", kind: "ram", icon: <Cpu size={35}/> },
-    { name: "512GB NVMe M.2 PCIe Gen3 SSD", compatibility: "Fits: ThinkPad, Latitude", price: "UGX 145,000", condition: "NEW", kind: "ssd", icon: <HardDrive size={35}/> },
+    { name: '14-inch Laptop Replacement Display', compatibility: "Check connector and laptop model", price: "UGX 180,000", condition: "NEW", image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=760&q=85" },
+    { name: "8GB DDR4 Laptop Memory", compatibility: "Confirm speed and device support", price: "UGX 85,000", condition: "REFURBISHED", image: "https://images.unsplash.com/photo-1541029071515-84cc54f84dc5?auto=format&fit=crop&w=760&q=85" },
+    { name: "512GB Solid-State Drive", compatibility: "Check SATA / NVMe compatibility", price: "UGX 145,000", condition: "NEW", image: "https://images.unsplash.com/photo-1531492746076-161ca9bcad58?auto=format&fit=crop&w=760&q=85" },
+    { name: "Laptop Power Adapter", compatibility: "Match voltage and connector", price: "UGX 65,000", condition: "NEW", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=760&q=85" },
   ];
+  const searchFor = (keyword: string, chosenLocation = location) => {
+    const params = new URLSearchParams();
+    if (keyword.trim()) params.set("q", keyword.trim());
+    if (chosenLocation) params.set("location", chosenLocation);
+    navigate("/directory" + (params.toString() ? "?" + params.toString() : ""));
+  };
   const search = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const params = new URLSearchParams();
-    if (part.trim()) params.set("q", part.trim());
-    if (location) params.set("location", location);
-    navigate(`/directory${params.toString() ? "?" + params.toString() : ""}`);
+    searchFor(part);
   };
-  return <main className="gura-landing">
-    <section className="container gura-landing-hero">
-      <span className="gura-landing-kicker"><span aria-hidden="true"/> Regional Computer Parts &amp; Hardware Network</span>
-      <h1>Find the right computer part, <em>closer to you.</em></h1>
-      <p>Connect directly with local repair shops, suppliers, and technicians in your area. Explore the network, inquire about available components, and reduce sourcing time.</p>
-      <form className="gura-landing-search" role="search" onSubmit={search}>
-        <label className="gura-landing-query"><Search size={20}/><span className="sr-only">Computer parts or suppliers</span><input aria-label="Computer parts or suppliers" placeholder="Search replacement screens, RAM, storage, power adapters..." value={part} onChange={e=>setPart(e.target.value)}/></label>
-        <label className="gura-landing-location"><MapPin size={17}/><span className="sr-only">Location</span><select aria-label="Location" value={location} onChange={e=>setLocation(e.target.value)}><option value="">All Locations</option><option value="Kabale">Kabale</option><option value="Mbarara">Mbarara</option><option value="Kampala">Kampala</option><option value="Fort Portal">Fort Portal</option><option value="Ntungamo">Ntungamo</option></select></label>
-        <button className="button" type="submit">Search Network <ArrowRight size={17}/></button>
-      </form>
-      <p className="gura-landing-disclaimer">Search currently discovers supplier and service profiles. Live parts inventory and stock search are in development.</p>
-    </section>
-    <section className="container gura-landing-section">
-      <div className="gura-landing-section-title"><h2>Popular Hardware Categories</h2><p>Browse the local network by component type</p></div>
-      <div className="gura-landing-categories">
-        {categories.map(category=><Link to={`/directory?q=${encodeURIComponent(category.keyword)}`} className="gura-category-tile" key={category.title}><span className="gura-category-icon">{category.icon}</span><strong>{category.title}</strong><small>{category.detail}</small><ArrowRight className="gura-category-arrow" size={16}/></Link>)}
+  return <main className="gura-tech-home">
+    <section className="gura-tech-hero" aria-labelledby="gura-tech-heading">
+      <div className="container gura-tech-hero-inner">
+        <div className="gura-tech-hero-content">
+          <span className="gura-tech-kicker">BUILT IN KABALE, UGANDA <span aria-label="Uganda">🇺🇬</span></span>
+          <h1 id="gura-tech-heading">FIND THE<br/>MISSING <em>PIECE.</em><br/>FINISH THE JOB.</h1>
+          <p className="gura-tech-intro">The parts and electronics network for Uganda's repair community. Don't turn customers away — discover who may have what you need.</p>
+          <form className="gura-tech-search" role="search" onSubmit={search}>
+            <label className="gura-tech-search-field"><Search size={21} aria-hidden="true"/><span className="sr-only">Search parts and suppliers</span><input value={part} onChange={event=>setPart(event.target.value)} placeholder="e.g., DDR4 8GB RAM, HP Envy screen..." aria-label="Search parts and suppliers"/></label>
+            <label className="gura-tech-search-location"><MapPin size={18} aria-hidden="true"/><span className="sr-only">Select location</span><select value={location} onChange={event=>setLocation(event.target.value)} aria-label="Location"><option value="">All Uganda</option><option value="Kabale">Kabale</option><option value="Mbarara">Mbarara</option><option value="Kampala">Kampala</option><option value="Fort Portal">Fort Portal</option><option value="Ntungamo">Ntungamo</option></select></label>
+            <button className="gura-tech-search-submit" type="submit">SEARCH <ArrowRight size={20}/></button>
+          </form>
+          <div className="gura-tech-quick"><strong>QUICK SHOUTS:</strong>{["DDR4 RAM", "MACBOOK CHARGER", "THERMAL PASTE", "SSD 256GB", "HP BATTERY"].map(keyword=><button key={keyword} type="button" onClick={()=>searchFor(keyword)}>{keyword}</button>)}</div>
+          <p className="gura-tech-search-note">Search currently matches local business and service listings. Live product inventory is being developed.</p>
+        </div>
+        <div className="gura-tech-hero-aside" aria-label="GURA marketplace features">
+          <span className="gura-tech-aside-overline">THE GURA NETWORK</span>
+          <h2>Source smarter.<br/><span>Repair faster.</span></h2>
+          <div><ShieldCheck size={19}/><span>Discover business profiles</span></div>
+          <div><Store size={19}/><span>Connect with local suppliers</span></div>
+          <div><Wrench size={19}/><span>Find technical assistance</span></div>
+          <Link to="/directory">Explore the network <ArrowRight size={17}/></Link>
+        </div>
+      </div>
+      <div className="container gura-tech-proof" aria-label="Marketplace highlights">
+        <div><strong>LOCAL</strong><span>BUILT FOR UGANDA</span></div>
+        <div><strong>TECH</strong><span>REPAIR COMMUNITY</span></div>
+        <div><strong>PARTS</strong><span>DISCOVER & SOURCE</span></div>
+        <div><strong>ONE</strong><span>CONNECTED NETWORK</span></div>
       </div>
     </section>
-    <section className="container gura-landing-section">
-      <div className="gura-landing-section-title"><div><h2>Verified Nearby Inventory</h2><p>See the kind of hardware listing GURA is being built to support</p></div><span className="gura-preview-label">Illustrative examples — not live stock</span></div>
-      <div className="gura-landing-products">
-        {samples.map(sample=><article className="gura-part-card" key={sample.name}>
-          <div className="gura-part-visual">{sample.icon}<span>Example listing</span></div>
-          <div className="gura-part-details"><span className={sample.condition==="NEW"?"gura-condition new":"gura-condition refurbished"}>{sample.condition}</span><h3>{sample.name}</h3><span className="gura-compatibility">{sample.compatibility}</span><strong className="gura-part-price">{sample.price}</strong></div>
-          <div className="gura-part-footer"><span><ShieldCheck size={15}/> Supplier details pending</span><span>Demo only</span></div>
-        </article>)}
+    <section className="gura-tech-content">
+      <div className="container gura-tech-section">
+        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">DISCOVER WHAT YOU NEED</span><h2>Explore electronics & parts</h2><p>Start with a category, then connect with shops and repair professionals.</p></div><Link to="/directory">Browse all <ArrowRight size={17}/></Link></div>
+        <div className="gura-tech-categories">{categories.map(category=><Link to={"/directory?q="+encodeURIComponent(category.keyword)} className="gura-tech-category" key={category.title}><img src={category.image} alt="" loading="lazy"/><div><strong>{category.title}</strong><small>{category.detail}</small></div><ArrowRight size={17} aria-hidden="true"/></Link>)}</div>
       </div>
-      <p className="gura-example-note">The sample names and prices above are taken from the supplied design reference for layout demonstration. They are not offers, verified sellers, or confirmed stock quantities.</p>
-    </section>
-    <section className="container gura-urgent-banner" id="urgent-requests">
-      <div><h2>Can't find the specific part you need?</h2><p>GURA is developing urgent parts requests so local suppliers can respond while customer contact details remain protected.</p></div><Link className="button" to="/directory">Contact a Supplier <ArrowRight size={17}/></Link>
-    </section>
-    <section className="container gura-landing-trust">
-      <div><ShieldCheck size={25}/><span><strong>Supplier Verification</strong><small>Business identity review is part of the platform's trust roadmap.</small></span></div>
-      <div><LockKeyhole size={25}/><span><strong>Private Inquiries</strong><small>Share details with appropriate access controls, not in public listings.</small></span></div>
-      <div><ClipboardList size={25}/><span><strong>Order Audit Trails</strong><small>Traceable parts order records are planned for the marketplace.</small></span></div>
+      <div className="container gura-tech-section">
+        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">A GLIMPSE OF GURA</span><h2>Parts you'll be able to source</h2><p>Realistic product photography and sample prices for the marketplace preview.</p></div><span className="gura-tech-demo-tag">DEMO PRODUCTS</span></div>
+        <div className="gura-tech-products">{samples.map(sample=><article className="gura-tech-product" key={sample.name}><div className="gura-tech-product-image"><img src={sample.image} alt={"Illustrative product category photo for "+sample.name} loading="lazy"/><span>DEMO</span></div><div className="gura-tech-product-body"><small className="gura-tech-condition">{sample.condition}</small><h3>{sample.name}</h3><p>{sample.compatibility}</p><strong>{sample.price}</strong><button type="button" onClick={()=>searchFor(sample.name)}>Find suppliers <ArrowRight size={16}/></button></div></article>)}</div>
+        <p className="gura-tech-demo-note">These images and prices are examples for design preview only, not live product offers, verified stock or confirmed supplier listings.</p>
+      </div>
+      <div className="container gura-tech-request" id="urgent-requests"><div><span className="gura-tech-overline">CAN'T FIND IT?</span><h2>Missing a part? Find someone who can help.</h2><p>Browse nearby suppliers or describe your need in a service request to a listed provider.</p></div><Link to="/directory">Find a supplier <ArrowRight size={18}/></Link></div>
+      <div className="container gura-tech-benefits"><div><ShieldCheck size={24}/><span><strong>Built around trust</strong><small>Verification and moderation tools for business profiles.</small></span></div><div><MessageCircle size={24}/><span><strong>Connect directly</strong><small>Start a service inquiry with a local provider.</small></span></div><div><MapPin size={24}/><span><strong>Made for local sourcing</strong><small>Discover services and shops by location.</small></span></div></div>
     </section>
   </main>;
 }
