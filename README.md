@@ -112,3 +112,18 @@ To deploy:
 5. After deployment, verify `/health` on the API URL and open the frontend URL.
 
 Do not commit `.env` files or Supabase secret keys. The Blueprint intentionally marks `DATABASE_URL` as a secret input. Frontend environment variables are injected at build time, so redeploy the web service after changing the API URL.
+
+## GURA shopping cart and checkout
+
+The customer-facing `/shop` catalog, product detail pages, `/cart`, `/checkout` and `/orders` use `/api/commerce` routes.
+
+- Products have server-owned UGX prices and listed unit quantities. Checkout validates quantities on the server.
+- The initial four products are **demo items only**; their names, images, prices and unit counts illustrate the experience, not real stock. Checkout creates a clearly labeled demo order without collecting funds.
+- A logged-in **customer** account is required to place orders. Order creation adds an in-app notification and optionally sends email if `RESEND_API_KEY` / `RESEND_FROM` or SMTP is configured.
+- Real product inventory must be onboarded, verified and approved before customers can place payable orders.
+- Secure live payment can be configured using Pesapal API 3: set `PESAPAL_CONSUMER_KEY`, `PESAPAL_CONSUMER_SECRET`, `PESAPAL_IPN_ID`, and `PESAPAL_ENV` (`sandbox` by default; `live` only after tests). Register `https://gura-api-272p.onrender.com/api/commerce/payment-ipn` as a GET IPN URL in the Pesapal merchant portal.
+- Once configured for non-demo orders, GURA creates the order and redirects the customer to Pesapal hosted checkout, where available MTN/Airtel/mobile money or card payment choices are handled by the provider. **GURA never accepts a MoMo PIN or raw card details.** Payment status is verified using Pesapal's transaction-status API. Pending orders must **not** be interpreted as paid.
+- The customer can check their order and verify the transaction via `/orders`. The callback redirects there, and the Pesapal IPN also triggers verification. Inventory is decremented after payment has been independently verified.
+- Before enabling live payments, complete merchant onboarding, fraud/security review, webhook testing, refunds, reconciliation, verified vendor inventory, taxes and delivery policies.
+
+This version does **not** accept real payment for its example products and does not claim any completed transactions.
