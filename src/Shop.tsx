@@ -31,7 +31,7 @@ const addToCart=(product:ShopProduct,quantity=1)=>{
   const cart=getCart();const existing=cart.find(x=>x.productId===product.id);
   const current=existing?.quantity||0;
   if(product.availableUnits<=0)throw new Error("This item is out of stock.");
-  if(current+quantity>product.availableUnits)throw new Error("Not enough units available.");
+  if(current+quantity>product.availableUnits || current+quantity>20)throw new Error("Maximum 20 units per product, subject to available stock.");
   const next=existing?cart.map(x=>x.productId===product.id?{...x,quantity:x.quantity+quantity}:x):[...cart,{productId:product.id,quantity}];
   storeCart(next);
 };
@@ -59,11 +59,11 @@ export function CartPage(){
   const navigate=useNavigate();const {products,loading,error}=useProducts();const [entries,setEntries]=useState<CartEntry[]>(getCart);
   const lines=useMemo(()=>entries.map(e=>({entry:e,product:products.find(p=>p.id===e.productId)})).filter((x):x is {entry:CartEntry;product:ShopProduct}=>Boolean(x.product)),[entries,products]);
   const total=lines.reduce((sum,x)=>sum+x.product.priceUgx*x.entry.quantity,0);
-  const adjust=(id:string,count:number)=>{const product=products.find(p=>p.id===id);const next=entries.map(x=>x.productId===id?{...x,quantity:Math.min(product?.availableUnits||20,Math.max(0,count))}:x).filter(x=>x.quantity>0);setEntries(next);storeCart(next)};
+  const adjust=(id:string,count:number)=>{const product=products.find(p=>p.id===id);const next=entries.map(x=>x.productId===id?{...x,quantity:Math.min(20,product?.availableUnits||20,Math.max(0,count))}:x).filter(x=>x.quantity>0);setEntries(next);storeCart(next)};
   return <main className="container gura-shop-page"><Link to="/shop" className="gura-shop-back"><ArrowLeft size={16}/> Continue shopping</Link><header className="gura-shop-heading"><h1>Your shopping cart</h1></header>
     {loading&&<p>Loading cart...</p>}{error&&<p role="alert" className="gura-shop-error">{error}</p>}
     {!loading&&!entries.length&&<div className="gura-shop-empty"><ShoppingCart size={42}/><h2>Your cart is empty</h2><Link className="gura-shop-primary" to="/shop">Browse products <ArrowRight size={16}/></Link></div>}
-    <div className="gura-cart-layout"><div>{lines.map(({entry,product:p})=><div className="gura-cart-line" key={p.id}><Link to={"/shop/product/"+p.id}><img src={p.imageUrl} alt={p.name}/></Link><div><Link to={"/shop/product/"+p.id}><strong>{p.name}</strong></Link><small>{p.isDemo?"Demo listing":"Product"} · {money(p.priceUgx)} each</small><div className="gura-quantity"><button onClick={()=>adjust(p.id,entry.quantity-1)} aria-label="Remove one"><Minus size={15}/></button><span>{entry.quantity}</span><button onClick={()=>adjust(p.id,entry.quantity+1)} disabled={entry.quantity>=p.availableUnits} aria-label="Add one"><Plus size={15}/></button></div></div><div className="gura-cart-line-total"><b>{money(p.priceUgx*entry.quantity)}</b><button aria-label={"Remove "+p.name} onClick={()=>adjust(p.id,0)}><X size={16}/></button></div></div>)}</div>
+    <div className="gura-cart-layout"><div>{lines.map(({entry,product:p})=><div className="gura-cart-line" key={p.id}><Link to={"/shop/product/"+p.id}><img src={p.imageUrl} alt={p.name}/></Link><div><Link to={"/shop/product/"+p.id}><strong>{p.name}</strong></Link><small>{p.isDemo?"Demo listing":"Product"} · {money(p.priceUgx)} each</small><div className="gura-quantity"><button onClick={()=>adjust(p.id,entry.quantity-1)} aria-label="Remove one"><Minus size={15}/></button><span>{entry.quantity}</span><button onClick={()=>adjust(p.id,entry.quantity+1)} disabled={entry.quantity>=Math.min(20,p.availableUnits)} aria-label="Add one"><Plus size={15}/></button></div></div><div className="gura-cart-line-total"><b>{money(p.priceUgx*entry.quantity)}</b><button aria-label={"Remove "+p.name} onClick={()=>adjust(p.id,0)}><X size={16}/></button></div></div>)}</div>
     {!!lines.length&&<aside className="gura-cart-summary"><h2>Order summary</h2><p>Subtotal <b>{money(total)}</b></p><p>Delivery <b>To be confirmed</b></p><div className="gura-cart-total">Total <strong>{money(total)}</strong></div><button className="gura-shop-primary" onClick={()=>navigate("/checkout")} disabled={lines.some(x=>x.entry.quantity>x.product.availableUnits)}>Proceed to checkout <ArrowRight size={17}/></button></aside>}</div>
   </main>;
 }
