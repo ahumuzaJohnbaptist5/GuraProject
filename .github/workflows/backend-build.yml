@@ -1,4 +1,4 @@
-name: Backend build
+name: Backend build and database smoke test
 on:
   pull_request:
     branches: [main]
@@ -7,9 +7,27 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: gura
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gura"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: server
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/gura
+      WEB_ORIGIN: http://127.0.0.1:5173
+      PORT: 8787
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -23,3 +41,11 @@ jobs:
         run: npm ci
       - name: Compile TypeScript
         run: npm run build
+      - name: Run PostgreSQL migrations
+        run: npm run db:migrate
+      - name: Verify product catalog and health endpoints
+        run: |
+          node dist/index.js &
+          sleep 3
+          curl --fail --silent http://127.0.0.1:8787/health | grep '"ok":true'
+          curl --fail --silent http://127.0.0.1:8787/api/commerce/products | grep 'GURA-DEMO-RAM'
