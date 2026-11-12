@@ -17,7 +17,7 @@ const protect = async (req: Request, res: Response, next: NextFunction) => {
     next();
   } catch (error) { next(error); }
 };
-const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
+const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
 const pesapalBase = process.env.PESAPAL_ENV === "live" ? "https://pay.pesapal.com/v3/api" : "https://cybqa.pesapal.com/pesapalv3/api";
 const pesapalEnabled = Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET && process.env.PESAPAL_IPN_ID);
 const moneyRequest = async (path: string, init?: RequestInit) => {
@@ -35,12 +35,12 @@ const pesapalToken = async () => {
   return result.token;
 };
 commerceRouter.get("/products", asyncRoute(async (_req, res) => {
-  const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
+  const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id LEFT JOIN users u ON u.id = l.owner_id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
   res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
 }));
 commerceRouter.get("/products/:id", asyncRoute(async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
-  const result = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.id = $1 AND p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\')', [id]);
+  const result = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id LEFT JOIN users u ON u.id = l.owner_id WHERE p.id = $1 AND p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\')', [id]);
   if (!result.rows.length) { res.status(404).json({ error: "Product not found." }); return; }
   res.json({ product: result.rows[0] });
 }));
