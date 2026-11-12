@@ -41,12 +41,12 @@ export const refreshSession = async (): Promise<User | null> => {
 const localAuthAdapter: AuthAdapter = {
   async register(user, password) {
     if (useApi) {
-      const result = await apiRequest<{ user: User }>("/api/auth/register", {
+      await apiRequest<{ message: string }>("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name: user.name, email: user.email, password, role: user.role === "administrator" ? "customer" : user.role }),
+        body: JSON.stringify({ name: user.name, email: user.email, password, confirmPassword: password, role: user.role === "administrator" ? "customer" : user.role }),
       });
-      saveSessionUser(result.user);
-      return result.user;
+      // Registration is not sign-in: do not cache a session or set the active user.
+      return user;
     }
     const users = readUsers();
     if (users.some((entry) => entry.email.toLowerCase() === user.email.toLowerCase())) {
@@ -54,7 +54,6 @@ const localAuthAdapter: AuthAdapter = {
     }
     const stored = { ...user, password };
     writeUsers([...users, stored]);
-    saveSessionUser(user);
     return user;
   },
   async login({ email, password }: Credentials) {
