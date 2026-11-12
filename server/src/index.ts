@@ -8,6 +8,7 @@ import { pool, query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
 import { createNotification } from "./notifications.js";
 import { commerceRouter } from "./commerce.js";
+import { appendAudit, verifyLedger, withAuditTransaction } from "./auditLedger.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -325,17 +326,23 @@ app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (r
     return;
   }
   const input = z.object({ moderationStatus: z.enum(["approved", "rejected", "pending"]) }).parse(request.body);
-  const result = await query(
-    `UPDATE listings SET moderation_status = $1, verified = CASE WHEN $1 = 'approved' THEN TRUE ELSE FALSE END
-     WHERE id = $2
-     RETURNING ${listingSelect}`,
-    [input.moderationStatus, String(request.params.id)],
-  );
-  if (!result.rows[0]) {
+  const listing = await withAuditTransaction(async (client) => {
+    const result = await client.query(
+      `UPDATE listings SET moderation_status = $1, verified = CASE WHEN $1 = 'approved' THEN TRUE ELSE FALSE END
+       WHERE id = $2 RETURNING ${listingSelect}`,
+      [input.moderationStatus, String(request.params.id)],
+    );
+    if (!result.rows[0]) return null;
+    await appendAudit(client, { actorId:user.id, action:"listing.moderated",
+      subjectType:"listing", subjectId:String(request.params.id),
+      detail:{status:input.moderationStatus} });
+    return result.rows[0];
+  });
+  if (!listing) {
     response.status(404).json({ error: "Listing not found." });
     return;
   }
-  response.json({ listing: result.rows[0] });
+  response.json({ listing });
 }));
 
 app.post("/api/reports", requireUser, asyncRoute(async (request, response) => {
@@ -376,17 +383,20 @@ app.patch("/api/admin/reports/:id", requireUser, asyncRoute(async (request, resp
     return;
   }
   const input = z.object({ status: z.enum(["open", "resolved", "dismissed"]) }).parse(request.body);
-  const result = await query(
-    `UPDATE listing_reports SET status = $1 WHERE id = $2
-     RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
-       created_at AS "createdAt"`,
-    [input.status, String(request.params.id)],
-  );
-  if (!result.rows[0]) {
-    response.status(404).json({ error: "Report not found." });
-    return;
-  }
-  response.json({ report: result.rows[0] });
+  const report = await withAuditTransaction(async (client) => {
+    const result = await client.query(
+      `UPDATE listing_reports SET status = $1 WHERE id = $2
+       RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+         created_at AS "createdAt"`,
+      [input.status, String(request.params.id)],
+    );
+    if (!result.rows[0]) return null;
+    await appendAudit(client, {actorId:user.id,action:"report.moderated",subjectType:"report",
+      subjectId:String(request.params.id),detail:{status:input.status}});
+    return result.rows[0];
+  });
+  if (!report) { response.status(404).json({ error: "Report not found." }); return; }
+  response.json({ report });
 }));
 
 app.get("/api/admin/users", requireUser, asyncRoute(async (_request, response) => {
@@ -409,17 +419,40 @@ app.patch("/api/admin/users/:id", requireUser, asyncRoute(async (request, respon
     return;
   }
   const input = z.object({ verified: z.boolean().optional(), suspended: z.boolean().optional() }).refine((value) => value.verified !== undefined || value.suspended !== undefined).parse(request.body);
-  const result = await query<AuthUser>(
-    `UPDATE users SET verified = COALESCE($1, verified), suspended = COALESCE($2, suspended)
-     WHERE id = $3
-     RETURNING id, name, email, role, location, bio, verified, suspended`,
-    [input.verified ?? null, input.suspended ?? null, String(request.params.id)],
+  const updatedUser = await withAuditTransaction(async (client) => {
+    const result = await client.query<AuthUser>(
+      `UPDATE users SET verified = COALESCE($1, verified), suspended = COALESCE($2, suspended)
+       WHERE id = $3 RETURNING id, name, email, role, location, bio, verified, suspended`,
+      [input.verified ?? null, input.suspended ?? null, String(request.params.id)],
+    );
+    if (!result.rows[0]) return null;
+    await appendAudit(client, { actorId:actor.id, action:"user.admin_updated",
+      subjectType:"user",subjectId:String(request.params.id),
+      detail:{verified:result.rows[0].verified,suspended:result.rows[0].suspended} });
+    return result.rows[0];
+  });
+  if (!updatedUser) { response.status(404).json({ error: "User not found." }); return; }
+  response.json({ user: updatedUser });
+}));
+
+app.get("/api/admin/audit/integrity", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") { response.status(403).json({ error:"Administrator access required." }); return; }
+  const result = await verifyLedger();
+  response.status(result.valid ? 200 : 409).json(result);
+}));
+
+app.get("/api/admin/audit/ledger", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") { response.status(403).json({ error:"Administrator access required." }); return; }
+  const result = await query(
+    `SELECT id::text,actor_id AS "actorId",action,subject_type AS "subjectType",
+       subject_id AS "subjectId",details,occurred_at AS "occurredAt",
+       previous_hash AS "previousHash",entry_hash AS "entryHash",
+       signature IS NOT NULL AS "signed",high_value AS "highValue"
+     FROM secure_audit_ledger ORDER BY id DESC LIMIT 200`,
   );
-  if (!result.rows[0]) {
-    response.status(404).json({ error: "User not found." });
-    return;
-  }
-  response.json({ user: result.rows[0] });
+  response.json({entries:result.rows});
 }));
 
 app.get("/api/admin/audit", requireUser, asyncRoute(async (_request, response) => {
