@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle2, Minus, Plus, ShoppingCart, Package, ShieldCheck, X, RefreshCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Minus, Plus, ShoppingCart, Package, ShieldCheck, Store, Wrench, X, RefreshCcw } from "lucide-react";
 import type { User } from "./types";
 
 export type ShopProduct = {
   id:string; sku:string; name:string; description:string; category:string; priceUgx:number; availableUnits:number;
   imageUrl:string; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean;
 };
+type ProviderListing={id:string;name:string;type:"shop"|"technician"|"seller";location:string;text:string;images?:string[];verified:boolean;moderationStatus:"pending"|"approved"|"rejected"};
 type CartEntry={productId:string;quantity:number};
 type Order={id:string;status:string;paymentMethod:string;amountUgx:number;createdAt:string;items:{productId:string;quantity:number;name:string;priceUgx:number}[]};
 const KEY="gura-marketplace-cart";
@@ -37,6 +38,17 @@ const addToCart=(product:ShopProduct,quantity=1)=>{
 };
 export function ShopPage(){
   const {products,loading,error}=useProducts();const [query,setQuery]=useState("");const [category,setCategory]=useState("All");
+  const [providers,setProviders]=useState<ProviderListing[]>([]);
+  const [providersError,setProvidersError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    fetch(API_URL+"/api/listings",{credentials:"include"}).then(async response=>{
+      if(!response.ok)throw new Error("Unable to load local business listings.");
+      return await response.json() as {listings:ProviderListing[]};
+    }).then(data=>{if(active)setProviders(data.listings.filter(p=>p.moderationStatus!=="rejected"))})
+      .catch(error=>{if(active)setProvidersError(error instanceof Error?error.message:"Unable to load businesses.")});
+    return()=>{active=false};
+  },[]);
   const categories=["All",...new Set(products.map(x=>x.category))];
   const shown=products.filter(p=>(category==="All"||p.category===category)&&(p.name+" "+p.description+" "+p.compatibility).toLowerCase().includes(query.toLowerCase()));
   return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">GURA marketplace</p><h1>Electronic devices & spare parts</h1><p>Browse component details, compare specifications and see listed quantities.</p></div><Link className="gura-shop-cart-link" to="/cart"><ShoppingCart size={20}/> View cart</Link></header>
@@ -45,6 +57,15 @@ export function ShopPage(){
     <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={"Illustrative photo: "+p.name} loading="lazy"/>{p.isDemo&&<span>DEMO LISTING</span>}</Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>{p.isDemo?"Example units":"Available units"}: {p.availableUnits}</p><Link className="gura-shop-action" to={"/shop/product/"+p.id}>View full details <ArrowRight size={16}/></Link></div></article>)}</div>
     {!loading&&!error&&!shown.length&&<p>No matching products yet.</p>}
     <p className="gura-shop-note">DEMO products, prices and quantities are for testing the shopping experience. They are not verified supplier stock and cannot be paid for.</p>
+    <section className="gura-shop-provider-section" aria-labelledby="gura-provider-heading"><h2 id="gura-provider-heading">Local shops & technicians</h2>
+      <p>New provider listings appear here immediately with a Not Yet Verified badge, including their uploaded photos. GURA admin approval changes the badge to Verified.</p>
+      {providersError&&<p className="gura-shop-error" role="alert">{providersError}</p>}
+      <div className="gura-shop-providers">{providers.map(provider=><article className="gura-shop-provider" key={provider.id}>
+        {provider.images?.[0]?<img src={provider.images[0]} alt={provider.name+" listing photo"} loading="lazy"/>:<div className="gura-shop-provider-placeholder">{provider.type==="technician"?<Wrench size={37}/>:<Store size={37}/>}</div>}
+        <div className="gura-shop-provider-info"><span>{provider.moderationStatus==="approved"&&provider.verified?<span className="verified"><ShieldCheck size={14}/> Verified</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</span><h3>{provider.name}</h3><p>{provider.location} · {provider.type==="technician"?"Technician":"Shop / supplier"}</p><p>{provider.text.length>125?provider.text.slice(0,122)+"...":provider.text}</p>
+          <Link to={"/directory?q="+encodeURIComponent(provider.name)}>View listing & details <ArrowRight size={15}/></Link>
+        </div></article>)}</div>
+    </section>
   </main>;
 }
 export function ProductPage(){
