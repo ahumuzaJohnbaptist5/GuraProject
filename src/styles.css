@@ -1104,3 +1104,19 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 /* Confirmation after registration: account creation is not a login session. */
 .app-shell .gura-auth-success{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #a5dec0;background:#f0fcf5;color:#176a42;border-radius:8px;font-size:13px;font-weight:650;line-height:1.5;margin:14px 0 18px}
 .app-shell .gura-auth-success svg{flex:none;margin-top:1px}
+
+/* Provider profile contact and account security controls */
+.app-shell .gura-profile-public-contacts{border-top:1px solid #e1e9ed;padding-top:18px;margin-top:14px;display:grid;gap:12px}
+.app-shell .gura-profile-public-contacts h3{font-size:16px;margin:0;color:#17333e}
+.app-shell .gura-profile-public-contacts p{font-size:13px;color:#657d86;line-height:1.6;margin:0}
+.app-shell .gura-profile-contact-values{display:grid;gap:6px}
+.app-shell .gura-profile-contact-values strong{font-weight:600;overflow-wrap:anywhere}
+.app-shell .gura-profile-password-form{display:grid;gap:13px;margin-top:16px}
+.app-shell .gura-profile-password-form>label:not(.gura-password-visibility){display:grid;gap:6px;font-size:13px;font-weight:700;color:#27444c}
+.app-shell .gura-profile-password-form input:not([type="checkbox"]){width:100%;border:1px solid #d0dde2;border-radius:7px;padding:11px;background:white}
+.app-shell .gura-password-visibility{display:flex;gap:9px;align-items:center;font-size:13px}
+.app-shell .gura-profile-password-form>small{font-size:12px;color:#657b84;line-height:1.5}
+.app-shell .gura-marketplace-contacts{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0}
+.app-shell .gura-marketplace-contacts>strong{width:100%;font-size:13px;color:#244451}
+.app-shell .gura-marketplace-contacts>a{display:inline-flex;padding:8px 11px;border:1px solid #c5d8dc;background:#f0f8f9;color:#176073;font-weight:750;font-size:12px;border-radius:6px;text-decoration:none}
+.app-shell .gura-marketplace-contacts>a:hover{background:#e0f1f3}
