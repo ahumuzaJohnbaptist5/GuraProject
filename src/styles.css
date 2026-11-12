@@ -1045,3 +1045,23 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 @media(max-width:450px){.app-shell .gura-shop-grid{grid-template-columns:1fr}.app-shell .gura-product-hero-image,.app-shell .gura-product-hero-image img{min-height:260px}.app-shell .gura-order-head{align-items:start}.app-shell .gura-order-card{padding:14px}}
 
 .app-shell .gura-order-status.sandbox_paid{background:#fff1df;color:#995618}
+
+/* Pending provider listings remain public, with clear verification state. */
+.app-shell .gura-unverified{display:inline-flex;gap:5px;align-items:center;color:#8b5515;background:#fff4dc;border:1px solid #edcf93;border-radius:99px;padding:5px 9px;font-size:11px;font-weight:750;white-space:nowrap}
+.app-shell .gura-listing-unverified-note,.app-shell .gura-listing-verified-note{display:flex;gap:9px;align-items:flex-start;padding:12px 13px;border:1px solid #ecd6ad;background:#fff8e9;border-radius:8px;color:#79541e;font-size:13px;line-height:1.6}
+.app-shell .gura-listing-unverified-note svg,.app-shell .gura-listing-verified-note svg{flex:none;margin-top:2px}
+.app-shell .gura-listing-verified-note{border-color:#b4e5cf;background:#effbf4;color:#176b49}
+.app-shell .gura-shop-provider-section{padding-top:38px}
+.app-shell .gura-shop-provider-section h2{font-size:28px;color:#173640;margin-bottom:6px}
+.app-shell .gura-shop-provider-section>p{color:#687d84;font-size:14px;margin:0 0 20px}
+.app-shell .gura-shop-providers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}
+.app-shell .gura-shop-provider{display:flex;flex-direction:column;background:#fff;border:1px solid #dae4e7;border-radius:11px;overflow:hidden}
+.app-shell .gura-shop-provider>img{width:100%;height:174px;object-fit:cover;display:block;background:#edf1f3}
+.app-shell .gura-shop-provider-placeholder{display:grid;place-items:center;height:174px;background:#eaf0f2;color:#577b89}
+.app-shell .gura-shop-provider-info{display:grid;align-content:start;gap:10px;padding:16px;flex:1}
+.app-shell .gura-shop-provider-info h3{font-size:17px;color:#16343e;margin:0}
+.app-shell .gura-shop-provider-info p{margin:0;font-size:13px;color:#6b7e86}
+.app-shell .gura-shop-provider-info a{margin-top:auto;font-weight:750;color:#aa5429;font-size:13px}
+.app-shell .gura-shop-provider-info .gura-unverified{justify-self:start}
+@media(max-width:850px){.app-shell .gura-shop-providers{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.app-shell .gura-shop-providers{grid-template-columns:1fr}.app-shell .gura-shop-provider>img,.app-shell .gura-shop-provider-placeholder{height:190px}}

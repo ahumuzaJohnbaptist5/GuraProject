@@ -143,7 +143,7 @@ app.get("/api/listings", asyncRoute(async (_request, response) => {
     `SELECT id, owner_id AS "ownerId", name, type, location, text, services,
             image_urls AS "images", verified, rating, availability,
             moderation_status AS "moderationStatus"
-     FROM listings WHERE moderation_status = 'approved' ORDER BY rating DESC, created_at DESC`,
+     FROM listings WHERE moderation_status IN ('pending', 'approved') ORDER BY CASE WHEN moderation_status = 'approved' THEN 0 ELSE 1 END, rating DESC, created_at DESC`,
   );
   response.json({ listings: result.rows });
 }));
@@ -257,12 +257,12 @@ app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (r
     response.status(403).json({ error: "Administrator access required." });
     return;
   }
-  const input = z.object({ moderationStatus: z.enum(["approved", "rejected", "pending"]), verified: z.boolean().optional() }).parse(request.body);
+  const input = z.object({ moderationStatus: z.enum(["approved", "rejected", "pending"]) }).parse(request.body);
   const result = await query(
-    `UPDATE listings SET moderation_status = $1, verified = COALESCE($2, verified)
-     WHERE id = $3
+    `UPDATE listings SET moderation_status = $1, verified = CASE WHEN $1 = 'approved' THEN TRUE ELSE FALSE END
+     WHERE id = $2
      RETURNING ${listingSelect}`,
-    [input.moderationStatus, input.verified ?? null, String(request.params.id)],
+    [input.moderationStatus, String(request.params.id)],
   );
   if (!result.rows[0]) {
     response.status(404).json({ error: "Listing not found." });
@@ -398,7 +398,7 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
     preferredDate: z.string().date().optional(),
     preferredTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   }).parse(request.body);
-  const listing = await query<{ owner_id: string | null }>("SELECT owner_id FROM listings WHERE id = $1 AND moderation_status = 'approved'", [input.listingId]);
+  const listing = await query<{ owner_id: string | null }>("SELECT owner_id FROM listings WHERE id = $1 AND moderation_status IN ('pending', 'approved')", [input.listingId]);
   if (!listing.rows[0]) {
     response.status(404).json({ error: "Listing not found." });
     return;
