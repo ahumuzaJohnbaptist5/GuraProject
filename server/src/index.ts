@@ -73,12 +73,16 @@ const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attemp
 app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, response) => {
   const input = registerSchema.parse(request.body);
   const passwordHash = await hashPassword(input.password);
-  const result = await query<AuthUser>(
-    `INSERT INTO users (name, email, password_hash, role)
-     VALUES ($1, lower($2), $3, $4)
-     RETURNING id, name, email, role, location, bio, verified, suspended`,
-    [input.name, input.email, passwordHash, input.role],
-  );
+  await withAuditTransaction(async client=>{
+    const result = await client.query<AuthUser>(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, lower($2), $3, $4)
+       RETURNING id, name, email, role, location, bio, verified, suspended`,
+      [input.name, input.email, passwordHash, input.role],
+    );
+    await appendAudit(client,{actorId:result.rows[0].id,action:"user.registered",
+      subjectType:"user",subjectId:result.rows[0].id,detail:{role:input.role}});
+  });
   // Account creation does not authenticate the user. Sign-in is required.
   response.status(201).json({ message: "Account created successfully. Please sign in." });
 }));
