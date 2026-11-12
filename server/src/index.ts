@@ -503,16 +503,21 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
     response.status(404).json({ error: "Listing not found." });
     return;
   }
-  const result = await query(
-    `INSERT INTO service_requests
-      (customer_id, provider_id, listing_id, title, details, preferred_date, preferred_time)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
-       title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
-       confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
-    [user.id, listing.rows[0].owner_id, input.listingId, input.title, input.details, input.preferredDate || null, input.preferredTime || null],
-  );
-  response.status(201).json({ request: result.rows[0] });
+  const createdRequest = await withAuditTransaction(async client=>{
+    const result = await client.query(
+      `INSERT INTO service_requests
+        (customer_id, provider_id, listing_id, title, details, preferred_date, preferred_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
+         title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
+         confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
+      [user.id, listing.rows[0].owner_id, input.listingId, input.title, input.details, input.preferredDate || null, input.preferredTime || null],
+    );
+    await appendAudit(client,{actorId:user.id,action:"service_request.created",
+      subjectType:"service_request",subjectId:result.rows[0].id,detail:{listingId:input.listingId}});
+    return result.rows[0];
+  });
+  response.status(201).json({ request: createdRequest });
   if (listing.rows[0].owner_id) {
     await createNotification(listing.rows[0].owner_id, "New service request", input.title);
   }
@@ -568,16 +573,23 @@ app.patch("/api/requests/:id/status", requireUser, asyncRoute(async (request, re
     response.status(403).json({ error: "Only the customer can cancel this request." });
     return;
   }
-  const result = await query(
-    `UPDATE service_requests SET status = $1 WHERE id = $2
-     RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
-       title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
-       confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
-    [input.status, requestId],
-  );
-  response.json({ request: result.rows[0] });
+  const changedRequest=await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `UPDATE service_requests SET status = $1 WHERE id = $2
+       RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
+         title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
+         confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
+      [input.status, requestId],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"service_request.status_updated",
+      subjectType:"service_request",subjectId:requestId,detail:{status:input.status}});
+    return result.rows[0];
+  });
+  if(!changedRequest){response.status(404).json({error:"Request not found."});return;}
+  response.json({request:changedRequest});
   if (input.status !== "cancelled" && item.customer_id !== user.id) {
-    await createNotification(item.customer_id, `Request ${input.status}`, result.rows[0].title);
+    await createNotification(item.customer_id, `Request ${input.status}`, changedRequest.title);
   }
 }));
 
