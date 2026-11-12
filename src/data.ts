@@ -11,8 +11,8 @@ const AUDIT_KEY = "gura-audit";
 const DOMAIN_KEYS = [LISTINGS_KEY, REQUESTS_KEY, MESSAGES_KEY, REVIEWS_KEY, FAVORITES_KEY, NOTIFICATIONS_KEY, REPORTS_KEY, AUDIT_KEY];
 // Production always uses the real API; local-only demo accounts are development-only.
 const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
-const API_URL = (configuredApiUrl || (import.meta.env.PROD ? "https://gura-api-272p.onrender.com" : undefined))?.replace(/\/+$/, "");
-const useApi = Boolean(API_URL);
+const API_URL = import.meta.env.PROD ? "" : configuredApiUrl?.replace(/\/+$/, "");
+const useApi = import.meta.env.PROD || Boolean(API_URL);
 
 const legacyDemoListingIds = new Set([
   "listing-maya",
