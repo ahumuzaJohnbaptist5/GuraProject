@@ -1089,3 +1089,14 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell .gura-item-active{display:flex;flex-direction:row;align-items:center;gap:10px}
 .app-shell .gura-item-active input{width:auto}
 @media(max-width:600px){.app-shell .gura-provider-product-row{flex-wrap:wrap}.app-shell .gura-product-manage-actions{width:100%;justify-content:flex-end}}
+
+/* Up to three product photographs, including one main gallery image. */
+.app-shell .gura-product-gallery{min-width:0}
+.app-shell .gura-product-thumbnails{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap}
+.app-shell .gura-product-thumbnails button{width:84px;height:78px;background:#fff;border:2px solid #d8e2e8;border-radius:8px;padding:3px;cursor:pointer;overflow:hidden}
+.app-shell .gura-product-thumbnails button.selected{border-color:#ee7a37;box-shadow:0 0 0 2px #fce6d5}
+.app-shell .gura-product-thumbnails img{width:100%;height:100%;object-fit:cover;border-radius:4px}
+.app-shell .gura-item-photo-previews{display:flex;flex-wrap:wrap;gap:14px}
+.app-shell .gura-item-photo-preview{display:grid;gap:6px;justify-items:start}
+.app-shell .gura-item-photo-preview button{border:1px solid #d2dfe5;background:#f4f7f9;color:#9d421e;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12px}
+.app-shell .gura-item-photo-preview small{color:#527083;font-weight:700}
