@@ -138,7 +138,7 @@ const orderInput = z.object({
 });
 commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
   const user = res.locals.user as AuthUser;
-  if (user.role !== "customer") { res.status(403).json({ error: "Use a customer account to checkout." }); return; }
+  // Any authenticated GURA account may place an order, regardless of account role.
   const input = orderInput.parse(req.body);
   const combined = new Map<string, number>();
   for (const item of input.items) combined.set(item.productId, (combined.get(item.productId) || 0) + item.quantity);
