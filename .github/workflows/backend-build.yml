@@ -49,3 +49,4 @@ jobs:
           sleep 3
           curl --fail --silent http://127.0.0.1:8787/health | grep '"ok":true'
           node -e 'fetch("http://127.0.0.1:8787/api/commerce/products").then(r => r.json()).then(d => { if (!Array.isArray(d.products) || d.products.some(p => p.isDemo)) process.exit(1); }).catch(() => process.exit(1))'
+          node -e 'fetch("http://127.0.0.1:8787/api/commerce/catalog").then(async r => { const d=await r.json(); if (!r.ok || !Array.isArray(d.products) || !d.pagination) process.exit(1); }).catch(() => process.exit(1))'
