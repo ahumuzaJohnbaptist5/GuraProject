@@ -10,10 +10,25 @@ const buckets = new Map<string, Bucket>();
 
 const clientKey = (request: Request) => request.ip || request.socket.remoteAddress || "unknown";
 
-export const rateLimit = (windowMs: number, max: number, message: string): RequestHandler => {
+type RateLimitOptions = { skipReadOnly?: boolean; keyByEmail?: boolean };
+
+export const rateLimit = (windowMs: number, max: number, message: string, options: RateLimitOptions = {}): RequestHandler => {
   return (request, response, next) => {
+    // Public catalog and business reads must not be locked out by other
+    // visitors sharing the frontend reverse proxy's apparent IP address.
+    if (options.skipReadOnly && ["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      next();
+      return;
+    }
     const now = Date.now();
-    const key = `${message}:${clientKey(request)}`;
+    const submittedEmail = options.keyByEmail && typeof request.body?.email === "string"
+      ? request.body.email.trim().toLowerCase()
+      : "";
+    // Authentication attempts are counted per account, not per shared
+    // Render proxy IP. Unknown/invalid identifiers still fall back to IP.
+    const identity = submittedEmail && submittedEmail.length <= 320
+      ? "email:" + submittedEmail : "ip:" + clientKey(request);
+    const key = `${message}:${identity}`;
     const bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + windowMs });
