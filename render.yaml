@@ -17,6 +17,10 @@ services:
         value: 7
       - key: DATABASE_URL
         sync: false
+      - key: AUDIT_SIGNING_KEY
+        sync: false
+      - key: HIGH_VALUE_ORDER_UGX
+        value: "1000000"
       - key: WEB_ORIGIN
         value: https://gura-web-bkid.onrender.com
       - key: RESEND_API_KEY
