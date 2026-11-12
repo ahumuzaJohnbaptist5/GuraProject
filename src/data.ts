@@ -23,11 +23,31 @@ const legacyDemoListingIds = new Set([
   "00000000-0000-0000-0000-000000000003",
 ]);
 
+// Listing photographs can exceed browser localStorage limits. The API is the
+// authoritative source in production; keep its listing response in memory.
+let apiListingCache: Listing[] | null = null;
 const read = <T,>(key: string, fallback: T): T => {
-  const raw = localStorage.getItem(key);
-  return raw ? (JSON.parse(raw) as T) : fallback;
+  if (useApi && key === LISTINGS_KEY) return (apiListingCache || fallback) as T;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch { return fallback; }
 };
-const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+const write = (key: string, value: unknown) => {
+  if (useApi && key === LISTINGS_KEY) {
+    apiListingCache = value as Listing[];
+    try { localStorage.removeItem(LISTINGS_KEY); } catch { /* storage unavailable */ }
+    return;
+  }
+  try { localStorage.setItem(key, JSON.stringify(value)); }
+  catch (error) { console.warn("Unable to cache GURA browser data", key, error); }
+};
+export const refreshListings = async (): Promise<Listing[]> => {
+  if (!useApi) return listListings();
+  const result = await apiRequest<{ listings: Listing[] }>("/api/listings");
+  write(LISTINGS_KEY, result.listings);
+  return result.listings;
+};
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_URL}${path}`, {

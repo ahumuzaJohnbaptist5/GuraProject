@@ -4,7 +4,7 @@ import cors from "cors";
 import { z } from "zod";
 import { config } from "./config.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword, type AuthUser } from "./auth.js";
-import { query } from "./db.js";
+import { pool, query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
 import { createNotification } from "./notifications.js";
 import { commerceRouter } from "./commerce.js";
@@ -194,13 +194,35 @@ app.post("/api/listings", requireUser, asyncRoute(async (request, response) => {
     response.status(400).json({ error: "Listing type must match the provider role." });
     return;
   }
-  const result = await query(
-    `INSERT INTO listings (owner_id, name, type, location, text, services, image_urls, availability)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING ${listingSelect}`,
-    [user.id, input.name, input.type, input.location, input.text, input.services, input.imageUrls ?? [], input.availability ?? null],
-  );
-  response.status(201).json({ listing: result.rows[0] });
+  const client = await pool.connect();
+  let created;
+  try {
+    await client.query("BEGIN");
+    // One transaction-scoped lock per account prevents rapid duplicate submissions.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [user.id]);
+    const previous = await client.query<{ id: string }>(
+      "SELECT id FROM listings WHERE owner_id = $1 LIMIT 1", [user.id],
+    );
+    if (previous.rows.length) {
+      await client.query("ROLLBACK");
+      response.status(409).json({ error: "Your account already owns a business. Update its products, services, and photos rather than creating another business." });
+      return;
+    }
+    const result = await client.query(
+      `INSERT INTO listings (owner_id, name, type, location, text, services, image_urls, availability)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING ${listingSelect}`,
+      [user.id, input.name, type, input.location, input.text, input.services, input.imageUrls ?? [], input.availability ?? null],
+    );
+    created = result.rows[0];
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  response.status(201).json({ listing: created });
 }));
 
 app.patch("/api/listings/:id", requireUser, asyncRoute(async (request, response) => {
@@ -238,6 +260,11 @@ app.post("/api/listings/:id/claim", requireUser, asyncRoute(async (request, resp
     return;
   }
   const listingId = String(request.params.id);
+  const owned = await query("SELECT id FROM listings WHERE owner_id = $1 LIMIT 1", [user.id]);
+  if (owned.rows.length) {
+    response.status(409).json({ error: "Your account already has a business profile. You cannot claim a second business." });
+    return;
+  }
   const result = await query(
     `UPDATE listings SET owner_id = $1, moderation_status = 'pending', verified = false
      WHERE id = $2 AND owner_id IS NULL AND type = $3
