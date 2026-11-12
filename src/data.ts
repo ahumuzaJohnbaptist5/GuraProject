@@ -292,7 +292,7 @@ export type DomainAdapter = {
   listReports: () => ListingReport[];
   createReport: (report: ListingReport) => ListingReport;
   updateReportStatus: (id: string, status: ListingReport["status"]) => void;
-  updateUser: (userId: string, update: Partial<User>) => void;
+  updateUser: (userId: string, update: Partial<User>) => Promise<User>;
   listUsers: () => User[];
   listAuditEvents: () => AuditEvent[];
   createAuditEvent: (event: AuditEvent) => AuditEvent;
@@ -321,15 +321,24 @@ export const domainAdapter: DomainAdapter = {
   listReports,
   createReport,
   updateReportStatus,
-  updateUser(userId, update) {
+  async updateUser(userId, update) {
+    // Never display a successful verification until the backend confirms it.
+    let saved: User;
     if (useApi) {
-      void apiRequest<{ user: User }>(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(update) })
-        .catch((error) => console.error("Unable to update API user", error));
+      saved = (await apiRequest<{ user: User }>(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...(update.verified !== undefined ? { verified: update.verified } : {}),
+          ...(update.suspended !== undefined ? { suspended: update.suspended } : {}),
+        }),
+      })).user;
+    } else {
+      const existing = listUsers().find(user => user.id === userId);
+      if (!existing) throw new Error("Account not found.");
+      saved = { ...existing, ...update };
     }
-    const raw = localStorage.getItem("gura-users");
-    if (!raw) return;
-    const users = JSON.parse(raw) as Array<User & { password: string }>;
-    localStorage.setItem("gura-users", JSON.stringify(users.map((user) => user.id === userId ? { ...user, ...update } : user)));
+    write("gura-users", listUsers().map(user => user.id === userId ? saved : user));
+    return saved;
   },
   listUsers,
   listAuditEvents,
