@@ -20,6 +20,7 @@ type AuditInput = {
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const signature = (hash: string) => signingKey ? createHmac("sha256", signingKey).update(hash).digest("hex") : null;
 const genesis = "0".repeat(64);
+const canonicalDetail = (detail: AuditInput["detail"] = {}) => Object.fromEntries(Object.entries(detail || {}).sort(([a],[b]) => a.localeCompare(b)));
 
 export async function appendAudit(client: PoolClient, input: AuditInput) {
   if (input.highValue && signingKey.length < 32) throw new Error("AUDIT_SIGNING_KEY (32+ characters) is required for high-value orders.");
@@ -29,10 +30,11 @@ export async function appendAudit(client: PoolClient, input: AuditInput) {
   const previous = await client.query<{entry_hash:string}>("SELECT entry_hash FROM secure_audit_ledger ORDER BY id DESC LIMIT 1");
   const prevHash = previous.rows[0]?.entry_hash || genesis;
   const createdAt = new Date().toISOString();
+  const detail = canonicalDetail(input.detail);
   const body = JSON.stringify({
     previous: prevHash, at: createdAt, actor: input.actorId || null,
     action: input.action, subjectType: input.subjectType,
-    subjectId: input.subjectId, detail: input.detail || {},
+    subjectId: input.subjectId, detail,
   });
   const entryHash = digest(body);
   const proof = signature(entryHash);
@@ -41,7 +43,7 @@ export async function appendAudit(client: PoolClient, input: AuditInput) {
        previous_hash,entry_hash,signature,high_value)
      VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10) RETURNING id::text,entry_hash`,
     [input.actorId || null,input.action,input.subjectType,input.subjectId,
-      JSON.stringify(input.detail || {}),createdAt,prevHash,entryHash,proof,!!input.highValue],
+      JSON.stringify(detail),createdAt,prevHash,entryHash,proof,!!input.highValue],
   );
   return { id: inserted.rows[0].id, hash: inserted.rows[0].entry_hash, signed: !!proof };
 }
@@ -63,7 +65,7 @@ export async function verifyLedger() {
   for (const row of records.rows) {
     const body = JSON.stringify({previous:row.previous_hash,at:new Date(row.occurred_at).toISOString(),
       actor:row.actor_id,action:row.action,subjectType:row.subject_type,
-      subjectId:row.subject_id,detail:row.details});
+      subjectId:row.subject_id,detail:canonicalDetail(row.details)});
     const hash = digest(body);
     if (row.previous_hash !== previous || row.entry_hash !== hash)
       return { valid:false, checked:records.rowCount, brokenAt:row.id, reason:"Hash-chain mismatch" };
