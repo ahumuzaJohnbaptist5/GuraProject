@@ -40,7 +40,8 @@ const addToCart=(product:ShopProduct,quantity=1)=>{
   storeCart(next);
 };
 export function ShopPage(){
-  const {products,loading,error}=useProducts();const [query,setQuery]=useState("");const [category,setCategory]=useState("All");
+  const {products,loading,error}=useProducts();const [params]=useSearchParams();const [query,setQuery]=useState(()=>params.get("q")||"");const [category,setCategory]=useState(()=>params.get("category")||"All");
+  useEffect(()=>{setQuery(params.get("q")||"");setCategory(params.get("category")||"All")},[params]);
   const [providers,setProviders]=useState<ProviderListing[]>([]);
   const [providersError,setProvidersError]=useState("");
   useEffect(()=>{
