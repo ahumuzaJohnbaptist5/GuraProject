@@ -6,8 +6,8 @@ const SESSION_KEY = "gura-session";
 type StoredUser = User & { password: string };
 // Production always uses the real API; local-only demo accounts are development-only.
 const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
-const API_URL = (configuredApiUrl || (import.meta.env.PROD ? "https://gura-api-272p.onrender.com" : undefined))?.replace(/\/+$/, "");
-const useApi = Boolean(API_URL);
+const API_URL = import.meta.env.PROD ? "" : configuredApiUrl?.replace(/\/+$/, "");
+const useApi = import.meta.env.PROD || Boolean(API_URL);
 
 const readUsers = (): StoredUser[] => {
   const raw = localStorage.getItem(USERS_KEY);
@@ -28,6 +28,14 @@ const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || "The server request failed.");
   return body as T;
+};
+
+// Reconcile browser-cached user against the authoritative backend session.
+export const refreshSession = async (): Promise<User | null> => {
+  if (!useApi) return localAuthAdapter.getCurrentUser();
+  const result = await apiRequest<{user: User | null}>("/api/auth/me");
+  saveSessionUser(result.user);
+  return result.user;
 };
 
 const localAuthAdapter: AuthAdapter = {

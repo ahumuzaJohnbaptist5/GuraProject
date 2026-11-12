@@ -10,7 +10,7 @@ export type ShopProduct = {
 type CartEntry={productId:string;quantity:number};
 type Order={id:string;status:string;paymentMethod:string;amountUgx:number;createdAt:string;items:{productId:string;quantity:number;name:string;priceUgx:number}[]};
 const KEY="gura-marketplace-cart";
-const API_URL=((import.meta.env.VITE_API_URL as string|undefined)?.trim() || (import.meta.env.PROD?"https://gura-api-272p.onrender.com":"http://localhost:8787")).replace(/\/+$/,"");
+const API_URL=import.meta.env.PROD?"":((import.meta.env.VITE_API_URL as string|undefined)?.trim() || "http://localhost:8787").replace(/\/+$/,"");
 const money=(n:number)=>"UGX "+n.toLocaleString("en-UG");
 const getCart=():CartEntry[]=>{try{const data=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(data)?data.filter((x:CartEntry)=>typeof x.productId==="string"&&Number.isInteger(x.quantity)&&x.quantity>0):[];}catch{return []}};
 const storeCart=(items:CartEntry[])=>{localStorage.setItem(KEY,JSON.stringify(items));window.dispatchEvent(new Event("gura-cart-updated"));};
@@ -69,11 +69,19 @@ export function CartPage(){
 }
 export function CheckoutPage({user}:{user:User|null}){
   const navigate=useNavigate();const {products,loading,error:loadError}=useProducts();const [entries]=useState<CartEntry[]>(getCart);
-  const [method,setMethod]=useState<"mtn"|"airtel"|"card">("mtn");const [phone,setPhone]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");
+  const [method,setMethod]=useState<"mtn"|"airtel"|"card">("mtn");const [phone,setPhone]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [sessionChecked,setSessionChecked]=useState(false);const [confirmedUser,setConfirmedUser]=useState<User|null>(null);
+  useEffect(()=>{
+    let active=true;
+    fetch(API_URL+"/api/auth/me",{credentials:"include"}).then(async res=>{
+      if(!res.ok) throw new Error("Session verification failed.");
+      return await res.json() as {user:User|null};
+    }).then(result=>{if(active)setConfirmedUser(result.user)}).catch(cause=>{if(active)setError(cause instanceof Error?cause.message:"Cannot verify your session.")}).finally(()=>{if(active)setSessionChecked(true)});
+    return()=>{active=false};
+  },[user?.id]);
   const lines=entries.map(e=>({entry:e,product:products.find(p=>p.id===e.productId)})).filter((x):x is {entry:CartEntry;product:ShopProduct}=>Boolean(x.product));
   const total=lines.reduce((sum,x)=>sum+x.product.priceUgx*x.entry.quantity,0);const isDemo=lines.some(x=>x.product.isDemo);
   const place=async()=>{
-    if(!user){navigate("/login");return;}
+    if(!confirmedUser){setError("Your session could not be verified. Please sign in again.");return;}
     setBusy(true);setError("");
     try{
       const result=await request<{order:{id:string;status:string;amountUgx:number};paymentAvailable:boolean}>("/orders",{
@@ -90,10 +98,10 @@ export function CheckoutPage({user}:{user:User|null}){
     }catch(e){setError(e instanceof Error?e.message:"Checkout was not completed.");}finally{setBusy(false)}
   };
   return <main className="container gura-shop-page"><Link to="/cart" className="gura-shop-back"><ArrowLeft size={16}/> Back to cart</Link><h1>Secure checkout</h1>{loadError&&<p role="alert" className="gura-shop-error">{loadError}</p>}
-    {!user&&<div className="gura-shop-warning">Please <Link to="/login">sign in</Link> with a customer account to place your order.</div>}
+    {!sessionChecked&&<div className="gura-shop-warning">Checking your sign-in session...</div>}{sessionChecked&&!confirmedUser&&<div className="gura-shop-warning">Your session is not active. Please <Link to="/login">sign in again</Link> to continue checkout.</div>}{sessionChecked&&confirmedUser&&confirmedUser.role!=="customer"&&<div className="gura-shop-warning">You are signed in as a {confirmedUser.role}. Checkout currently requires a customer account.</div>}
     {isDemo&&<div className="gura-shop-warning"><ShieldCheck size={19}/> You are checking out demonstration products. No money will be charged. A demo order will appear in your order history and notifications.</div>}
     <div className="gura-cart-layout"><section className="gura-checkout-options"><h2>Choose payment method</h2><label className={method==="mtn"?"active":""}><input type="radio" name="method" checked={method==="mtn"} onChange={()=>setMethod("mtn")}/> <span><b>MTN MoMo Pay</b><small>Authorize payment on your MTN phone</small></span></label><label className={method==="airtel"?"active":""}><input type="radio" name="method" checked={method==="airtel"} onChange={()=>setMethod("airtel")}/> <span><b>Airtel Money</b><small>Authorize payment on your Airtel phone</small></span></label><label className={method==="card"?"active":""}><input type="radio" name="method" checked={method==="card"} onChange={()=>setMethod("card")}/> <span><b>Debit / credit card</b><small>Enter card details only on the secure payment provider page</small></span></label>{method!=="card"&&<div className="gura-checkout-phone"><label htmlFor="gura-payment-phone">Mobile money number</label><input id="gura-payment-phone" type="tel" inputMode="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07XXXXXXXX" autoComplete="tel"/><small>A PIN request will appear through your mobile money provider when live payments are enabled. Never share your PIN with GURA.</small></div>}<p className="gura-shop-note">Live payments use a hosted gateway. We do not collect mobile-money PINs, card numbers or CVVs.</p></section>
-    <aside className="gura-cart-summary"><h2>Checkout summary</h2>{lines.map(x=><p key={x.product.id}>{x.product.name} × {x.entry.quantity}<b>{money(x.product.priceUgx*x.entry.quantity)}</b></p>)}<div className="gura-cart-total">Total <strong>{money(total)}</strong></div>{error&&<p role="alert" className="gura-shop-error">{error}</p>}<button className="gura-shop-primary" disabled={busy||loading||!user||!lines.length||lines.some(x=>x.entry.quantity>x.product.availableUnits)||(!isDemo&&method!=="card"&&!/^(?:\+?256|0)7[0-9]{8}$/.test(phone))} onClick={place}>{busy?"Processing...":isDemo?"Place demo order":"Pay securely"} <ArrowRight size={17}/></button><small>Orders remain unpaid until the gateway confirms payment. Listed availability can change before payment is verified.</small></aside></div>
+    <aside className="gura-cart-summary"><h2>Checkout summary</h2>{lines.map(x=><p key={x.product.id}>{x.product.name} × {x.entry.quantity}<b>{money(x.product.priceUgx*x.entry.quantity)}</b></p>)}<div className="gura-cart-total">Total <strong>{money(total)}</strong></div>{error&&<p role="alert" className="gura-shop-error">{error}</p>}<button className="gura-shop-primary" disabled={busy||loading||!sessionChecked||!confirmedUser||confirmedUser.role!=="customer"||!lines.length||lines.some(x=>x.entry.quantity>x.product.availableUnits)||(!isDemo&&method!=="card"&&!/^(?:\+?256|0)7[0-9]{8}$/.test(phone))} onClick={place}>{busy?"Processing...":isDemo?"Place demo order":"Pay securely"} <ArrowRight size={17}/></button><small>Orders remain unpaid until the gateway confirms payment. Listed availability can change before payment is verified.</small></aside></div>
   </main>;
 }
 export function OrdersPage({user}:{user:User|null}){

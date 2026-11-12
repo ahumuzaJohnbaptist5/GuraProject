@@ -38,7 +38,60 @@ const serve = async (request, response) => {
   }).pipe(response);
 };
 
+// Keep API requests same-origin so browsers send session cookies reliably.
+const apiOrigin = new URL(process.env.API_PROXY_TARGET || "https://gura-api-272p.onrender.com");
+const proxyApi = async (request, response) => {
+  const url = new URL(request.url || "/", "http://localhost");
+  if (!url.pathname.startsWith("/api/")) { response.writeHead(404); response.end(); return; }
+  const headers = {
+    Accept: request.headers.accept || "application/json",
+    "Content-Type": request.headers["content-type"] || "application/json",
+  };
+  if (request.headers.cookie) headers.Cookie = request.headers.cookie;
+  if (request.headers.origin) headers.Origin = request.headers.origin;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    let body;
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of request) {
+        size += chunk.length;
+        if (size > 9 * 1024 * 1024) {
+          response.writeHead(413, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({error:"Request body too large."}));
+          return;
+        }
+        chunks.push(chunk);
+      }
+      body = Buffer.concat(chunks);
+    }
+    const upstream = await fetch(new URL(url.pathname + url.search, apiOrigin), {
+      method: request.method, headers, body, redirect: "manual", signal: controller.signal,
+    });
+    const responseHeaders = { "Cache-Control":"no-store", "X-Content-Type-Options":"nosniff" };
+    const contentType = upstream.headers.get("content-type");
+    if (contentType) responseHeaders["Content-Type"] = contentType;
+    const cookie = upstream.headers.getSetCookie?.() || [];
+    if (cookie.length) responseHeaders["Set-Cookie"] = cookie;
+    response.writeHead(upstream.status, responseHeaders);
+    if (request.method === "HEAD") { response.end(); return; }
+    response.end(Buffer.from(await upstream.arrayBuffer()));
+  } catch (error) {
+    console.error("Gura API proxy error", error);
+    if (!response.headersSent) response.writeHead(502, { "Content-Type":"application/json", "Cache-Control":"no-store" });
+    response.end(JSON.stringify({error:"GURA service is temporarily unreachable. Please retry."}));
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 createServer((request, response) => {
+  if ((request.url || "").startsWith("/api/")) {
+    void proxyApi(request, response);
+    return;
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { Allow: "GET, HEAD" });
     response.end();
@@ -46,5 +99,5 @@ createServer((request, response) => {
   }
   void serve(request, response);
 }).listen(port, "0.0.0.0", () => {
-  console.log(`Gura web listening on port ${port}`);
+  console.log("Gura web listening on port " + port);
 });
