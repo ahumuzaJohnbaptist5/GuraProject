@@ -65,7 +65,7 @@ commerceRouter.get("/catalog", asyncRoute(async (req, res) => {
   if (filters.condition) filter("p.condition=?", filters.condition);
   if (filters.minPrice !== undefined) filter("p.price_ugx>=?", filters.minPrice);
   if (filters.maxPrice !== undefined) filter("p.price_ugx<=?", filters.maxPrice);
-  const from = " FROM marketplace_products p JOIN listings l ON p.business_listing_id=l.id WHERE " + conditions.join(" AND ");
+  const from = " FROM marketplace_products p JOIN listings l ON p.business_listing_id=l.id LEFT JOIN users u ON u.id=l.owner_id WHERE " + conditions.join(" AND ");
   const count = await query<{total:string}>("SELECT COUNT(*)::text AS total" + from, values);
   const total = Number(count.rows[0]?.total || 0);
   const products = await query("SELECT " + productFields + from + " ORDER BY p.created_at DESC, p.id DESC LIMIT $" + (values.length + 1) + " OFFSET $" + (values.length + 2), [...values, filters.limit, (filters.page - 1) * filters.limit]);
