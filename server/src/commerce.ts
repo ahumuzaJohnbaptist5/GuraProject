@@ -276,7 +276,7 @@ const syncPayment = async (trackingId:string) => {
           "UPDATE marketplace_orders SET status='sandbox_paid' WHERE id=$1 AND status='pending_payment' RETURNING id",
           [order.id],
         );
-        if (test.rowCount) await appendAudit(client,{actorId:order.customer_id,action:"payment.sandbox_confirmed",
+        if (test.rowCount) await appendAudit(client,{actorId:null,action:"payment.sandbox_confirmed",
           subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"sandbox_paid"},
           highValue:Number(order.amount_ugx)>=highValueThreshold});
         return !!test.rowCount;
@@ -296,7 +296,7 @@ const syncPayment = async (trackingId:string) => {
           if(!updated.rowCount) throw new Error("Insufficient inventory to fulfill paid order "+order.id);
         }
         await client.query("UPDATE marketplace_orders SET status='paid',paid_at=now() WHERE id=$1",[order.id]);
-        await appendAudit(client,{actorId:order.customer_id,action:"payment.confirmed",
+        await appendAudit(client,{actorId:null,action:"payment.confirmed",
           subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"paid"},
           highValue:Number(order.amount_ugx)>=highValueThreshold});
         success=true;
@@ -307,7 +307,7 @@ const syncPayment = async (trackingId:string) => {
   } else if(state==="FAILED"||state==="REVERSED"){
     await withAuditTransaction(async client=>{
       const result=await client.query("UPDATE marketplace_orders SET status='failed' WHERE id=$1 AND status='pending_payment' RETURNING id",[order.id]);
-      if(result.rowCount) await appendAudit(client,{actorId:order.customer_id,action:"payment.failed",
+      if(result.rowCount) await appendAudit(client,{actorId:null,action:"payment.failed",
         subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"failed"},
         highValue:Number(order.amount_ugx)>=highValueThreshold});
     });
