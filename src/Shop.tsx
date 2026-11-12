@@ -10,7 +10,7 @@ export type ShopProduct = {
 type CartEntry={productId:string;quantity:number};
 type Order={id:string;status:string;paymentMethod:string;amountUgx:number;createdAt:string;items:{productId:string;quantity:number;name:string;priceUgx:number}[]};
 const KEY="gura-marketplace-cart";
-const API_URL=((import.meta.env.VITE_API_URL as string|undefined)?.trim() || (import.meta.env.PROD?"https://gura-api-272p.onrender.com":"http://localhost:8787")).replace(/\/+$/,"");
+const API_URL=import.meta.env.PROD?"":((import.meta.env.VITE_API_URL as string|undefined)?.trim() || "http://localhost:8787").replace(/\/+$/,"");
 const money=(n:number)=>"UGX "+n.toLocaleString("en-UG");
 const getCart=():CartEntry[]=>{try{const data=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(data)?data.filter((x:CartEntry)=>typeof x.productId==="string"&&Number.isInteger(x.quantity)&&x.quantity>0):[];}catch{return []}};
 const storeCart=(items:CartEntry[])=>{localStorage.setItem(KEY,JSON.stringify(items));window.dispatchEvent(new Event("gura-cart-updated"));};
