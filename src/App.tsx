@@ -180,7 +180,7 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
         <p className="eyebrow">{mode === "login" ? "Welcome back" : "Join the GURA network"}</p>
         <h1>{mode === "login" ? "Sign in to GURA" : "Create your account"}</h1>
         <p className="muted-text">{mode === "login" ? "Enter your account credentials to continue." : "Tell us a little about yourself to get started."}</p>
-        {mode === "login" && searchParams.get("registered") === "1" && <div className="gura-auth-success" role="status"><CheckCircle2 size={19}/><span>Account created successfully! Please sign in with your email and password.</span></div>}
+        {mode === "login" && searchParams.get("registered") === "1" && <div className="gura-auth-success" role="status"><CheckCircle2 size={19}/><span>Account created successfully! Please sign in with your email and password.</span></div>}{mode === "login" && searchParams.get("passwordChanged") === "1" && <div className="gura-auth-success" role="status"><CheckCircle2 size={19}/><span>Password changed successfully. Please sign in with your new password.</span></div>}
         <form onSubmit={submit} className="gura-login-form">
           {mode === "register" && <>
             <label>Full name<input required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}/></label>
@@ -493,7 +493,13 @@ function ProfileMediaSection({ user, onUserUpdate }: { user: User; onUserUpdate:
 }
 
 function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: User) => void }) {
-  const [profile, setProfile] = useState({ name: user.name, location: user.location || "", bio: user.bio || "" });
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState({ name: user.name, location: user.location || "", bio: user.bio || "",
+    businessPhone:user.businessPhone || "", businessWhatsapp:user.businessWhatsapp || "", businessEmail:user.businessEmail || "" });
+  const [passwords, setPasswords] = useState({current:"",next:"",confirm:""});
+  const [passwordBusy,setPasswordBusy]=useState(false);
+  const [passwordError,setPasswordError]=useState("");
+  const [passwordVisible,setPasswordVisible]=useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -515,9 +521,11 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
     event.preventDefault();
     setSaving(true); setError(""); setMessage("");
     try {
-      const updated = await auth.saveProfile({ name: profile.name.trim(), location: profile.location.trim(), bio: profile.bio.trim() });
+      const updated = await auth.saveProfile({ name: profile.name.trim(), location: profile.location.trim(), bio: profile.bio.trim(),
+        ...(isProvider ? {businessPhone:profile.businessPhone.trim(),businessWhatsapp:profile.businessWhatsapp.trim(),businessEmail:profile.businessEmail.trim()}:{}),
+      });
       onUserUpdate(updated);
-      setProfile({ name: updated.name, location: updated.location || "", bio: updated.bio || "" });
+      setProfile({ name: updated.name, location: updated.location || "", bio: updated.bio || "",businessPhone:updated.businessPhone || "",businessWhatsapp:updated.businessWhatsapp || "",businessEmail:updated.businessEmail || "" });
       setEditing(false);
       setMessage("Your profile changes were saved.");
     } catch (cause) {
@@ -527,8 +535,21 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
     }
   };
   const cancel = () => {
-    setProfile({ name: user.name, location: user.location || "", bio: user.bio || "" });
+    setProfile({ name: user.name, location: user.location || "", bio: user.bio || "",businessPhone:user.businessPhone || "",businessWhatsapp:user.businessWhatsapp || "",businessEmail:user.businessEmail || "" });
     setEditing(false); setError(""); setMessage("");
+  };
+  const changePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();setPasswordError("");setMessage("");
+    if(passwords.next!==passwords.confirm){setPasswordError("New passwords do not match.");return;}
+    if(passwords.next.length<8){setPasswordError("New password must have at least 8 characters.");return;}
+    setPasswordBusy(true);
+    try{
+      await auth.changePassword(passwords.current,passwords.next,passwords.confirm);
+      setPasswords({current:"",next:"",confirm:""});
+      onUserUpdate(null as unknown as User);
+      navigate("/login?passwordChanged=1",{replace:true});
+    }catch(cause){setPasswordError(cause instanceof Error?cause.message:"Unable to update password.");}
+    finally{setPasswordBusy(false);}
   };
   return <main className="container gura-profile-page">
     <div className="gura-profile-breadcrumb"><Link to="/dashboard">Dashboard</Link><span>/</span><strong>My Profile</strong></div>
@@ -548,12 +569,20 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
         <div className="gura-profile-card-header"><div><h2>Personal information</h2><p>Update your details here; manage photos in the separate galleries below.</p></div>{!editing && <button type="button" className="gura-profile-edit" onClick={() => { setEditing(true); setMessage(""); }}><Wrench size={15}/> Edit profile</button>}</div>
         {editing ? <form onSubmit={submit} className="gura-profile-form">
           <div className="gura-profile-form-grid"><label>Full name<input required maxLength={120} autoComplete="name" value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })}/></label><label>{user.role === "shop" ? "Shop location / town" : "Location / town"}<input maxLength={160} autoComplete="address-level2" placeholder="e.g. Kabale, Uganda" value={profile.location} onChange={(event) => setProfile({ ...profile, location: event.target.value })}/></label></div>
+          {isProvider && <div className="gura-profile-public-contacts">
+            <h3>Marketplace contact information</h3><p>Only the details you enter here will be displayed publicly on your business and product listings. Your sign-in email stays private.</p>
+            <div className="gura-profile-form-grid">
+              <label>Business phone<input type="tel" inputMode="tel" placeholder="+256 7XXXXXXXX" value={profile.businessPhone} onChange={event=>setProfile({...profile,businessPhone:event.target.value})}/></label>
+              <label>WhatsApp number<input type="tel" inputMode="tel" placeholder="+256 7XXXXXXXX" value={profile.businessWhatsapp} onChange={event=>setProfile({...profile,businessWhatsapp:event.target.value})}/></label>
+            </div>
+            <label>Public business email (optional)<input type="email" placeholder="shop@example.com" value={profile.businessEmail} onChange={event=>setProfile({...profile,businessEmail:event.target.value})}/></label>
+          </div>}
           <label>{user.role === "shop" ? "About your business" : user.role === "technician" ? "Professional summary" : "About me"}<textarea maxLength={2000} rows={5} placeholder={details.bio} value={profile.bio} onChange={(event) => setProfile({ ...profile, bio: event.target.value })}/><small>{profile.bio.length}/2000 characters</small></label>
           <div className="gura-profile-form-actions"><button className="button" disabled={saving || !profile.name.trim()}>{saving ? "Saving changes..." : "Save changes"}</button><button type="button" className="gura-profile-cancel" disabled={saving} onClick={cancel}>Cancel</button></div>
         </form> : <div className="gura-profile-details">
           <div><span>Full name</span><strong>{user.name}</strong></div>
           <div><span>Email address</span><strong>{user.email}</strong><small>Your account email is read-only.</small></div>
-          <div><span>Location</span><strong>{user.location || "Not provided"}</strong></div>
+          <div><span>Location</span><strong>{user.location || "Not provided"}</strong></div>{isProvider && <div className="gura-profile-contact-values"><span>Public marketplace contacts</span><strong>{user.businessPhone || "No phone added"}</strong><strong>{user.businessWhatsapp ? "WhatsApp: "+user.businessWhatsapp : "WhatsApp not added"}</strong><strong>{user.businessEmail || "No public email added"}</strong><small>Only these business contact details are shared publicly.</small></div>}
           <div className="gura-profile-bio"><span>{user.role === "shop" ? "Business description" : user.role === "technician" ? "Professional summary" : "About"}</span><p>{user.bio || "No description added yet. Edit your profile to add one."}</p></div>
         </div>}
       </section>
@@ -563,7 +592,15 @@ function ProfilePage({ user, onUserUpdate }: { user: User; onUserUpdate: (user: 
           <Link className="gura-profile-action-link" to="/dashboard">Manage from dashboard <ArrowRight size={16}/></Link>
         </section>
         <section className="gura-profile-card"><h2>{user.role === "shop" ? "Grow your shop presence" : user.role === "technician" ? "Build your reputation" : user.role === "administrator" ? "Account responsibilities" : "Make the most of GURA"}</h2><ul className="gura-profile-tips">{details.tips.map((tip) => <li key={tip}><CheckCircle2 size={17}/><span>{tip}</span></li>)}</ul></section>
-        <section className="gura-profile-card gura-profile-security"><h2><LockKeyhole size={18}/> Account &amp; security</h2><div><span>Sign-in email</span><strong>{user.email}</strong></div><div><span>Account access</span><strong>{roleLabels[user.role]}</strong></div><p>Password changes and additional security options are not available on this profile page yet.</p></section>
+        <section className="gura-profile-card gura-profile-security"><h2><LockKeyhole size={18}/> Account &amp; security</h2><div><span>Sign-in email</span><strong>{user.email}</strong></div><div><span>Account access</span><strong>{roleLabels[user.role]}</strong></div><form onSubmit={changePassword} className="gura-profile-password-form">
+            <label>Current password<input required type={passwordVisible?"text":"password"} autoComplete="current-password" value={passwords.current} onChange={e=>setPasswords({...passwords,current:e.target.value})}/></label>
+            <label>New password<input required minLength={8} maxLength={128} type={passwordVisible?"text":"password"} autoComplete="new-password" value={passwords.next} onChange={e=>setPasswords({...passwords,next:e.target.value})}/></label>
+            <label>Confirm new password<input required minLength={8} maxLength={128} type={passwordVisible?"text":"password"} autoComplete="new-password" value={passwords.confirm} onChange={e=>setPasswords({...passwords,confirm:e.target.value})}/></label>
+            <label className="gura-password-visibility"><input type="checkbox" checked={passwordVisible} onChange={e=>setPasswordVisible(e.target.checked)}/> Show passwords</label>
+            {passwordError && <p className="error" role="alert">{passwordError}</p>}
+            <button type="submit" className="button" disabled={passwordBusy}>{passwordBusy?"Updating...":"Change password"}</button>
+            <small>For security, changing your password signs you out on all devices.</small>
+          </form></section>
       </aside>
     </div>
     {(user.role === "shop" || user.role === "technician") && <ProfileMediaSection user={user} onUserUpdate={onUserUpdate} />}
