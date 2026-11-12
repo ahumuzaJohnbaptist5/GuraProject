@@ -363,14 +363,19 @@ app.post("/api/reports", requireUser, asyncRoute(async (request, response) => {
     reason: z.string().trim().min(2).max(120),
     details: z.string().trim().min(2).max(2000),
   }).parse(request.body);
-  const result = await query(
-    `INSERT INTO listing_reports (id, listing_id, reporter_id, reason, details)
-     VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
-     RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
-       created_at AS "createdAt"`,
-    [input.id ?? null, input.listingId, user.id, input.reason, input.details],
-  );
-  response.status(201).json({ report: result.rows[0] });
+  const report = await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `INSERT INTO listing_reports (id, listing_id, reporter_id, reason, details)
+       VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
+       RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+         created_at AS "createdAt"`,
+      [input.id ?? null, input.listingId, user.id, input.reason, input.details],
+    );
+    await appendAudit(client,{actorId:user.id,action:"report.created",subjectType:"report",
+      subjectId:result.rows[0].id,detail:{listingId:input.listingId,reason:input.reason}});
+    return result.rows[0];
+  });
+  response.status(201).json({ report });
 }));
 
 app.get("/api/admin/reports", requireUser, asyncRoute(async (_request, response) => {
@@ -619,16 +624,24 @@ app.patch("/api/requests/:id/appointment", requireUser, asyncRoute(async (reques
     response.status(403).json({ error: "Only the assigned provider can confirm an appointment." });
     return;
   }
-  const result = await query(
-    `UPDATE service_requests SET confirmed_date = $1, confirmed_time = $2 WHERE id = $3
-     RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
-       title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
-       confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
-    [input.confirmedDate, input.confirmedTime || null, requestId],
-  );
-  response.json({ request: result.rows[0] });
+  const appointment = await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `UPDATE service_requests SET confirmed_date = $1, confirmed_time = $2 WHERE id = $3
+       RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
+         title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
+         confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
+      [input.confirmedDate, input.confirmedTime || null, requestId],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"service_request.appointment_confirmed",
+      subjectType:"service_request",subjectId:requestId,
+      detail:{date:input.confirmedDate,time:input.confirmedTime||null}});
+    return result.rows[0];
+  });
+  if(!appointment){response.status(404).json({error:"Request not found."});return;}
+  response.json({request:appointment});
   if (item.customer_id !== user.id) {
-    await createNotification(item.customer_id, "Appointment confirmed", `${result.rows[0].title} · ${input.confirmedDate}${input.confirmedTime ? ` at ${input.confirmedTime}` : ""}`);
+    await createNotification(item.customer_id, "Appointment confirmed", `${appointment.title} · ${input.confirmedDate}${input.confirmedTime ? ` at ${input.confirmedTime}` : ""}`);
   }
 }));
 
