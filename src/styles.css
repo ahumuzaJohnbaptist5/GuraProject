@@ -867,8 +867,8 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell:has(.gura-tech-home) .site-header .nav a:hover{color:#fa823e}
 .app-shell:has(.gura-tech-home) .site-header .nav .button{background:#fa823e;color:#0b171c}
 .app-shell .gura-tech-hero{position:relative;isolation:isolate;background:#07151b;color:#f8f9f9;overflow:hidden}
-.app-shell .gura-tech-hero:before{content:"";position:absolute;inset:0;z-index:-2;background-image:linear-gradient(90deg,rgba(5,15,20,.97) 0%,rgba(5,16,21,.88) 48%,rgba(4,17,24,.71) 100%),url("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2000&q=85");background-position:center;background-size:cover}
-.app-shell .gura-tech-hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,#07151b 0%,transparent 35%);pointer-events:none}
+.app-shell .gura-tech-hero:before{content:"";position:absolute;inset:0;z-index:-2;background-image:linear-gradient(90deg,rgba(5,15,20,.78) 0%,rgba(5,16,21,.58) 48%,rgba(4,17,24,.36) 100%),url("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2000&q=85");background-position:center;background-size:cover}
+.app-shell .gura-tech-hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,rgba(7,21,27,.88) 0%,transparent 28%);pointer-events:none}
 .app-shell .gura-tech-hero-inner{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(240px,.65fr);gap:7%;align-items:center;padding-top:92px;padding-bottom:80px}
 .app-shell .gura-tech-hero-content{max-width:835px}
 .app-shell .gura-tech-kicker{display:inline-flex;align-items:center;gap:9px;padding:7px 13px;background:#1abbd6;color:#04161b;font-size:11px;font-weight:850;letter-spacing:.12em;line-height:1.2}
