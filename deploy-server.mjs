@@ -73,6 +73,13 @@ const proxyApi = async (request, response) => {
     const responseHeaders = { "Cache-Control":"no-store", "X-Content-Type-Options":"nosniff" };
     const contentType = upstream.headers.get("content-type");
     if (contentType) responseHeaders["Content-Type"] = contentType;
+    const retryAfter = upstream.headers.get("retry-after");
+    if (retryAfter) responseHeaders["Retry-After"] = retryAfter;
+    const limitSource = upstream.headers.get("x-gura-rate-limit");
+    if (limitSource) responseHeaders["X-Gura-Rate-Limit"] = limitSource;
+    if (upstream.status === 429) {
+      console.warn("GURA upstream API returned HTTP 429", url.pathname, limitSource || "unidentified upstream limit");
+    }
     const cookie = upstream.headers.getSetCookie?.() || [];
     if (cookie.length) responseHeaders["Set-Cookie"] = cookie;
     response.writeHead(upstream.status, responseHeaders);
