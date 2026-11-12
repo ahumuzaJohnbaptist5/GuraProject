@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle2, Minus, Plus, ShoppingCart, Package, ShieldCheck, Store, Wrench, X, RefreshCcw } from "lucide-react";
 import type { User } from "./types";
+import { prepareListingPhotos } from "./listingPhotos";
 
 export type ShopProduct = {
   id:string; sku:string; name:string; description:string; category:string; priceUgx:number; availableUnits:number;
-  imageUrl:string; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean;
+  imageUrl:string; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean; sellerVerified?:boolean; businessName?:string;
 };
 type ProviderListing={id:string;name:string;type:"shop"|"technician"|"seller";location:string;text:string;images?:string[];verified:boolean;moderationStatus:"pending"|"approved"|"rejected"};
 type CartEntry={productId:string;quantity:number};
@@ -29,7 +30,8 @@ const useProducts=()=>{
   return {products,loading,error};
 };
 const addToCart=(product:ShopProduct,quantity=1)=>{
-  if(product.isDemo)throw new Error("This sample product is not available for purchase.");
+  if(product.isDemo)throw new Error("This item is not available for purchase.");
+  if(!product.sellerVerified)throw new Error("The seller has not yet been verified. You may inquire with the supplier instead.");
   const cart=getCart();const existing=cart.find(x=>x.productId===product.id);
   const current=existing?.quantity||0;
   if(product.availableUnits<=0)throw new Error("This item is out of stock.");
@@ -55,7 +57,7 @@ export function ShopPage(){
   return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">GURA marketplace</p><h1>Electronic devices & spare parts</h1><p>Browse component details, compare specifications and see listed quantities.</p></div><Link className="gura-shop-cart-link" to="/cart"><ShoppingCart size={20}/> View cart</Link></header>
     <div className="gura-shop-filters"><input aria-label="Search products" placeholder="Find a battery, screen, memory, storage..." value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Product category" value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
     {loading&&<p>Loading marketplace catalog...</p>}{error&&<p className="gura-shop-error" role="alert">{error}</p>}
-    <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={p.name} loading="lazy"/></Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>Available units: {p.availableUnits}</p><Link className="gura-shop-action" to={"/shop/product/"+p.id}>View full details <ArrowRight size={16}/></Link></div></article>)}</div>
+    <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={p.name} loading="lazy"/></Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>{p.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified seller</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p><p>Available units: {p.availableUnits}</p><Link className="gura-shop-action" to={"/shop/product/"+p.id}>View full details <ArrowRight size={16}/></Link></div></article>)}</div>
     {!loading&&!error&&!shown.length&&<div className="gura-shop-empty"><Package size={32}/><h2>No stocked products available yet</h2><p>Browse local suppliers and technician listings below to inquire about electronics and spare parts.</p><Link className="gura-shop-primary" to="/directory">Find local suppliers <ArrowRight size={16}/></Link></div>}
 
     <section className="gura-shop-provider-section" aria-labelledby="gura-provider-heading"><h2 id="gura-provider-heading">Local shops & technicians</h2>
@@ -74,7 +76,7 @@ export function ProductPage(){
   useEffect(()=>{if(!id)return;let active=true;request<{product:ShopProduct}>("/products/"+id).then(r=>{if(active)setProduct(r.product)}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[id]);
   const add=()=>{if(!product)return;try{addToCart(product,quantity);navigate("/cart")}catch(e){setError(e instanceof Error?e.message:"Cannot add to cart.")}};
   return <main className="container gura-shop-page"><Link className="gura-shop-back" to="/shop"><ArrowLeft size={16}/> All products</Link>{loading&&<p>Loading product information...</p>}{error&&<p className="gura-shop-error" role="alert">{error}</p>}
-    {product&&<div className="gura-product-layout"><div className="gura-product-hero-image"><img src={product.imageUrl} alt={product.name}/></div><div className="gura-product-information"><span className="gura-shop-category">{product.category} · {product.condition}</span><h1>{product.name}</h1><p>{product.description}</p><strong className="gura-product-price">{money(product.priceUgx)}</strong><p className="gura-product-stock">Available stock: <b>{product.availableUnits} units</b></p><p><b>Compatibility:</b> {product.compatibility}</p><h2>Full specifications</h2><dl className="gura-specs">{Object.entries(product.specifications).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}<div><dt>SKU</dt><dd>{product.sku}</dd></div><div><dt>Condition</dt><dd>{product.condition}</dd></div></dl><div className="gura-product-actions"><div className="gura-quantity"><button type="button" onClick={()=>setQuantity(q=>Math.max(1,q-1))} aria-label="Decrease quantity"><Minus size={16}/></button><span>{quantity}</span><button type="button" onClick={()=>setQuantity(q=>Math.min(Math.min(20,product.availableUnits),q+1))} aria-label="Increase quantity"><Plus size={16}/></button></div><button className="gura-shop-primary" onClick={add} disabled={product.availableUnits===0}><ShoppingCart size={18}/> Add to cart</button></div></div></div>}
+    {product&&<div className="gura-product-layout"><div className="gura-product-hero-image"><img src={product.imageUrl} alt={product.name}/></div><div className="gura-product-information"><span className="gura-shop-category">{product.category} · {product.condition}</span><h1>{product.name}</h1><p>{product.description}</p><strong className="gura-product-price">{money(product.priceUgx)}</strong><p>{product.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified supplier</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p>{product.businessName&&<p>Seller: <b>{product.businessName}</b></p>}<p className="gura-product-stock">Available stock: <b>{product.availableUnits} units</b></p><p><b>Compatibility:</b> {product.compatibility}</p><h2>Full specifications</h2><dl className="gura-specs">{Object.entries(product.specifications).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}<div><dt>SKU</dt><dd>{product.sku}</dd></div><div><dt>Condition</dt><dd>{product.condition}</dd></div></dl><div className="gura-product-actions"><div className="gura-quantity"><button type="button" onClick={()=>setQuantity(q=>Math.max(1,q-1))} aria-label="Decrease quantity"><Minus size={16}/></button><span>{quantity}</span><button type="button" onClick={()=>setQuantity(q=>Math.min(Math.min(20,product.availableUnits),q+1))} aria-label="Increase quantity"><Plus size={16}/></button></div><button className="gura-shop-primary" onClick={add} disabled={product.availableUnits===0||!product.sellerVerified}><ShoppingCart size={18}/> Add to cart</button></div></div></div>}
   </main>;
 }
 export function CartPage(){
@@ -140,4 +142,73 @@ export function OrdersPage({user}:{user:User|null}){
     {!user?<p><Link to="/login">Sign in</Link> to view your orders.</p>:<div className="gura-order-list">{orders.map(order=><article className="gura-order-card" key={order.id}><div className="gura-order-head"><div><strong>Order #{order.id.slice(0,8).toUpperCase()}</strong><small>{new Date(order.createdAt).toLocaleString("en-UG")}</small></div><span className={"gura-order-status "+order.status}>{order.status.replace("_"," ")}</span></div><div>{order.items.map(item=><p key={item.productId}>{item.quantity} × {item.name}<b>{money(item.priceUgx*item.quantity)}</b></p>)}</div><footer><strong>Total: {money(order.amountUgx)}</strong>{order.status==="pending_payment"&&<button onClick={()=>void verify(order.id)} disabled={busy}><RefreshCcw size={16}/> Verify payment</button>}</footer></article>)}{!orders.length&&!busy&&<div className="gura-shop-empty"><Package size={34}/><h2>No orders yet</h2><Link className="gura-shop-primary" to="/shop">Browse products</Link></div>}</div>}
   </main>;
 }
+
+type ManagedProduct=ShopProduct&{active:boolean};
+const emptyProduct=()=>({name:"",description:"",category:"",priceUgx:"",availableUnits:"",imageUrl:"",condition:"New",compatibility:"",active:true});
+export function ProviderInventory({user,hasBusiness}:{user:User;hasBusiness:boolean}){
+  const [items,setItems]=useState<ManagedProduct[]>([]);
+  const [open,setOpen]=useState(false);
+  const [editing,setEditing]=useState<string|null>(null);
+  const [form,setForm]=useState(emptyProduct);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const load=async()=>{
+    try{const result=await request<{products:ManagedProduct[]}>("/my-products");setItems(result.products)}
+    catch(cause){setError(cause instanceof Error?cause.message:"Unable to load your products.")}
+  };
+  useEffect(()=>{if(hasBusiness&&(user.role==="shop"||user.role==="technician"))void load()},[hasBusiness,user.id,user.role]);
+  if(user.role!=="shop"&&user.role!=="technician")return null;
+  const begin=(item?:ManagedProduct)=>{
+    setEditing(item?.id||null);
+    setForm(item?{name:item.name,description:item.description,category:item.category,priceUgx:String(item.priceUgx),availableUnits:String(item.availableUnits),imageUrl:item.imageUrl,condition:item.condition,compatibility:item.compatibility,active:item.active}:emptyProduct());
+    setError("");setNotice("");setOpen(true);
+  };
+  const save=async(event:React.FormEvent)=>{
+    event.preventDefault();setBusy(true);setError("");setNotice("");
+    try{
+      if(!form.imageUrl)throw new Error("Add a product photo first.");
+      const payload={name:form.name.trim(),description:form.description.trim(),category:form.category.trim(),
+        priceUgx:Number(form.priceUgx),availableUnits:Number(form.availableUnits),imageUrl:form.imageUrl,
+        condition:form.condition,compatibility:form.compatibility,active:form.active};
+      await request(editing?"/my-products/"+editing:"/my-products",{method:editing?"PATCH":"POST",body:JSON.stringify(payload)});
+      await load();setOpen(false);setNotice(editing?"Product updated.":"Product added to your business.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to save product.")}
+    finally{setBusy(false)}
+  };
+  const toggle=async(item:ManagedProduct)=>{
+    setBusy(true);setError("");
+    try{await request("/my-products/"+item.id,{method:"PATCH",body:JSON.stringify({active:!item.active})});await load()}
+    catch(cause){setError(cause instanceof Error?cause.message:"Unable to change product status.")}
+    finally{setBusy(false)}
+  };
+  return <section className="panel gura-provider-products">
+    <div className="panel-title"><div><p className="eyebrow">Inventory & services</p><h2>Products and items</h2></div>
+      {!open&&<button className="button small" disabled={!hasBusiness} onClick={()=>begin()}>Add product</button>}
+      {open&&<button className="text-button" onClick={()=>{setOpen(false);setError("")}}>Cancel</button>}</div>
+    <p className="muted-text">Add and update as many items as needed within your one business. Each product has its own photograph, price and available units. Items from unverified businesses show Not Yet Verified publicly and cannot be paid for until approval.</p>
+    {!hasBusiness&&<p className="gura-shop-warning">Create your business profile above before adding products.</p>}
+    {notice&&<p className="success" role="status">{notice}</p>}{error&&<p className="error" role="alert">{error}</p>}
+    {open&&<form onSubmit={save} className="listing-form gura-item-form">
+      <label>Product name<input required maxLength={160} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+      <label>Category<input required maxLength={100} placeholder="Screens, RAM, phones, laptops..." value={form.category} onChange={e=>setForm({...form,category:e.target.value})}/></label>
+      <label>Product details<textarea required rows={3} maxLength={2000} value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></label>
+      <label>Price in UGX<input required type="number" min="100" max="1000000000" value={form.priceUgx} onChange={e=>setForm({...form,priceUgx:e.target.value})}/></label>
+      <label>Available units<input required type="number" min="0" max="1000000" value={form.availableUnits} onChange={e=>setForm({...form,availableUnits:e.target.value})}/></label>
+      <label>Condition<select value={form.condition} onChange={e=>setForm({...form,condition:e.target.value})}><option>New</option><option>Used</option><option>Refurbished</option></select></label>
+      <label>Compatibility<input maxLength={300} placeholder="Supported device models" value={form.compatibility} onChange={e=>setForm({...form,compatibility:e.target.value})}/></label>
+      <label>Product photograph<input type="file" accept="image/jpeg,image/png,image/webp" onChange={async e=>{try{const images=await prepareListingPhotos(e.target.files,1);if(images[0])setForm(prev=>({...prev,imageUrl:images[0]}));setError("")}catch(cause){setError(cause instanceof Error?cause.message:"Photo could not be processed.")}e.target.value=""}}/></label>
+      {form.imageUrl&&<img className="gura-item-image-preview" src={form.imageUrl} alt="Product photo preview"/>}
+      <label className="gura-item-active"><input type="checkbox" checked={form.active} onChange={e=>setForm({...form,active:e.target.checked})}/> Listed in marketplace</label>
+      <button className="button" disabled={busy}>{busy?"Saving...":editing?"Save product updates":"Publish product"}</button>
+    </form>}
+    <div className="gura-provider-product-list">{items.map(item=><article className="gura-provider-product-row" key={item.id}>
+      <img src={item.imageUrl} alt={item.name}/>
+      <div><b>{item.name}</b><small>{money(item.priceUgx)} · {item.availableUnits} unit(s) · {item.active?"Listed":"Hidden"}</small></div>
+      <div className="gura-product-manage-actions"><button disabled={busy} onClick={()=>begin(item)}>Edit</button><button disabled={busy} onClick={()=>void toggle(item)}>{item.active?"Hide":"Show"}</button></div>
+    </article>)}</div>
+    {!items.length&&hasBusiness&&!open&&<p className="muted-text">No items added yet. Add your first product with a photo, price and stock quantity.</p>}
+  </section>;
+}
+
 export function CartHeaderLink(){const [count,setCount]=useState(()=>getCart().reduce((a,b)=>a+b.quantity,0));useEffect(()=>{const update=()=>setCount(getCart().reduce((a,b)=>a+b.quantity,0));window.addEventListener("gura-cart-updated",update);window.addEventListener("storage",update);return()=>{window.removeEventListener("gura-cart-updated",update);window.removeEventListener("storage",update)}},[]);return <Link to="/cart" className="gura-cart-nav" aria-label={"Shopping cart, "+count+" items"}><ShoppingCart size={18}/><span>{count}</span></Link>}
