@@ -198,15 +198,16 @@ export const createListing = async (listing: Listing): Promise<Listing> => {
   write(LISTINGS_KEY, [created, ...listListings().filter((item) => item.id !== created.id)]);
   return created;
 };
-export const updateListingStatus = (id: string, moderationStatus: Listing["moderationStatus"]) => {
-  if (useApi && moderationStatus) {
-    void apiRequest<{ listing: Listing }>(`/api/admin/listings/${id}/moderation`, {
-      method: "PATCH",
-      body: JSON.stringify({ moderationStatus }),
-    }).catch((error) => console.error("Unable to moderate API listing", error));
-  }
-  const next = listListings().map((listing) => listing.id === id ? { ...listing, moderationStatus, verified: moderationStatus === "approved" ? listing.verified : false } : listing);
-  write(LISTINGS_KEY, next);
+export const updateListingStatus = async (id: string, moderationStatus: Listing["moderationStatus"]): Promise<Listing> => {
+  const current = listListings().find((listing) => listing.id === id);
+  if (!current) throw new Error("Listing not found. Refresh the dashboard.");
+  const updated = useApi && moderationStatus
+    ? (await apiRequest<{ listing: Listing }>(`/api/admin/listings/${id}/moderation`, {
+        method: "PATCH", body: JSON.stringify({ moderationStatus }),
+      })).listing
+    : { ...current, moderationStatus, verified: moderationStatus === "approved" };
+  write(LISTINGS_KEY, listListings().map((listing) => listing.id === id ? updated : listing));
+  return updated;
 };
 export const updateListing = async (id: string, update: Partial<Listing>): Promise<Listing> => {
   const previous = listListings().find((listing) => listing.id === id);
@@ -266,7 +267,7 @@ export type DomainAdapter = {
   listNotifications: (userId: string) => Notification[];
   markNotificationsRead: (userId: string) => void;
   createListing: (listing: Listing) => Promise<Listing>;
-  updateListingStatus: (id: string, status: Listing["moderationStatus"]) => void;
+  updateListingStatus: (id: string, status: Listing["moderationStatus"]) => Promise<Listing>;
   updateListing: (id: string, update: Partial<Listing>) => Promise<Listing>;
   listReports: () => ListingReport[];
   createReport: (report: ListingReport) => ListingReport;
