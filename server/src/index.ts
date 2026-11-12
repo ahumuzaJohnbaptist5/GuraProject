@@ -256,6 +256,8 @@ app.post("/api/listings", requireUser, asyncRoute(async (request, response) => {
       [user.id, input.name, type, input.location, input.text, input.services, input.imageUrls ?? [], input.availability ?? null],
     );
     created = result.rows[0];
+    await appendAudit(client,{actorId:user.id,action:"listing.created",subjectType:"listing",
+      subjectId:created.id,detail:{type,moderationStatus:"pending"}});
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -279,19 +281,25 @@ app.patch("/api/listings/:id", requireUser, asyncRoute(async (request, response)
     response.status(403).json({ error: "Only the listing owner can edit this listing." });
     return;
   }
-  const result = await query(
-    `UPDATE listings SET
-      name = COALESCE($1, name), type = COALESCE($2, type), location = COALESCE($3, location),
-      text = COALESCE($4, text), services = COALESCE($5, services),
-      image_urls = COALESCE($6, image_urls), availability = COALESCE($7, availability),
-      moderation_status = CASE WHEN $8 = 'administrator' THEN moderation_status ELSE 'pending' END,
-      verified = CASE WHEN $8 = 'administrator' THEN verified ELSE false END
-     WHERE id = $9
-     RETURNING ${listingSelect}`,
-    [input.name ?? null, input.type ?? null, input.location ?? null, input.text ?? null,
-      input.services ?? null, input.imageUrls ?? null, input.availability ?? null, user.role, listingId],
-  );
-  response.json({ listing: result.rows[0] });
+  const updatedListing = await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `UPDATE listings SET
+        name = COALESCE($1, name), type = COALESCE($2, type), location = COALESCE($3, location),
+        text = COALESCE($4, text), services = COALESCE($5, services),
+        image_urls = COALESCE($6, image_urls), availability = COALESCE($7, availability),
+        moderation_status = CASE WHEN $8 = 'administrator' THEN moderation_status ELSE 'pending' END,
+        verified = CASE WHEN $8 = 'administrator' THEN verified ELSE false END
+       WHERE id = $9 RETURNING ${listingSelect}`,
+      [input.name ?? null, input.type ?? null, input.location ?? null, input.text ?? null,
+        input.services ?? null, input.imageUrls ?? null, input.availability ?? null, user.role, listingId],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"listing.updated",subjectType:"listing",
+      subjectId:listingId,detail:{moderationStatus:result.rows[0].moderationStatus}});
+    return result.rows[0];
+  });
+  if(!updatedListing){response.status(404).json({error:"Listing not found."});return;}
+  response.json({ listing: updatedListing });
 }));
 
 app.post("/api/listings/:id/claim", requireUser, asyncRoute(async (request, response) => {
@@ -306,17 +314,19 @@ app.post("/api/listings/:id/claim", requireUser, asyncRoute(async (request, resp
     response.status(409).json({ error: "Your account already has a business profile. You cannot claim a second business." });
     return;
   }
-  const result = await query(
-    `UPDATE listings SET owner_id = $1, moderation_status = 'pending', verified = false
-     WHERE id = $2 AND owner_id IS NULL AND type = $3
-     RETURNING ${listingSelect}`,
-    [user.id, listingId, user.role === "technician" ? "technician" : "shop"],
-  );
-  if (!result.rows[0]) {
-    response.status(409).json({ error: "Listing is unavailable or does not match your provider role." });
-    return;
-  }
-  response.json({ listing: result.rows[0] });
+  const claimedListing = await withAuditTransaction(async client=>{
+    const result = await client.query(
+      `UPDATE listings SET owner_id = $1, moderation_status = 'pending', verified = false
+       WHERE id = $2 AND owner_id IS NULL AND type = $3 RETURNING ${listingSelect}`,
+      [user.id, listingId, user.role === "technician" ? "technician" : "shop"],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"listing.claimed",subjectType:"listing",
+      subjectId:listingId,detail:{role:user.role}});
+    return result.rows[0];
+  });
+  if(!claimedListing){response.status(409).json({error:"Listing is unavailable or does not match your provider role."});return;}
+  response.json({ listing: claimedListing });
 }));
 
 app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (request, response) => {
