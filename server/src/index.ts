@@ -8,6 +8,7 @@ import { pool, query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
 import { createNotification } from "./notifications.js";
 import { commerceRouter } from "./commerce.js";
+import { appendAudit, verifyLedger, withAuditTransaction } from "./auditLedger.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -72,12 +73,16 @@ const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attemp
 app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, response) => {
   const input = registerSchema.parse(request.body);
   const passwordHash = await hashPassword(input.password);
-  const result = await query<AuthUser>(
-    `INSERT INTO users (name, email, password_hash, role)
-     VALUES ($1, lower($2), $3, $4)
-     RETURNING id, name, email, role, location, bio, verified, suspended`,
-    [input.name, input.email, passwordHash, input.role],
-  );
+  await withAuditTransaction(async client=>{
+    const result = await client.query<AuthUser>(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, lower($2), $3, $4)
+       RETURNING id, name, email, role, location, bio, verified, suspended`,
+      [input.name, input.email, passwordHash, input.role],
+    );
+    await appendAudit(client,{actorId:result.rows[0].id,action:"user.registered",
+      subjectType:"user",subjectId:result.rows[0].id,detail:{role:input.role}});
+  });
   // Account creation does not authenticate the user. Sign-in is required.
   response.status(201).json({ message: "Account created successfully. Please sign in." });
 }));
@@ -255,6 +260,8 @@ app.post("/api/listings", requireUser, asyncRoute(async (request, response) => {
       [user.id, input.name, type, input.location, input.text, input.services, input.imageUrls ?? [], input.availability ?? null],
     );
     created = result.rows[0];
+    await appendAudit(client,{actorId:user.id,action:"listing.created",subjectType:"listing",
+      subjectId:created.id,detail:{type,moderationStatus:"pending"}});
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -278,19 +285,25 @@ app.patch("/api/listings/:id", requireUser, asyncRoute(async (request, response)
     response.status(403).json({ error: "Only the listing owner can edit this listing." });
     return;
   }
-  const result = await query(
-    `UPDATE listings SET
-      name = COALESCE($1, name), type = COALESCE($2, type), location = COALESCE($3, location),
-      text = COALESCE($4, text), services = COALESCE($5, services),
-      image_urls = COALESCE($6, image_urls), availability = COALESCE($7, availability),
-      moderation_status = CASE WHEN $8 = 'administrator' THEN moderation_status ELSE 'pending' END,
-      verified = CASE WHEN $8 = 'administrator' THEN verified ELSE false END
-     WHERE id = $9
-     RETURNING ${listingSelect}`,
-    [input.name ?? null, input.type ?? null, input.location ?? null, input.text ?? null,
-      input.services ?? null, input.imageUrls ?? null, input.availability ?? null, user.role, listingId],
-  );
-  response.json({ listing: result.rows[0] });
+  const updatedListing = await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `UPDATE listings SET
+        name = COALESCE($1, name), type = COALESCE($2, type), location = COALESCE($3, location),
+        text = COALESCE($4, text), services = COALESCE($5, services),
+        image_urls = COALESCE($6, image_urls), availability = COALESCE($7, availability),
+        moderation_status = CASE WHEN $8 = 'administrator' THEN moderation_status ELSE 'pending' END,
+        verified = CASE WHEN $8 = 'administrator' THEN verified ELSE false END
+       WHERE id = $9 RETURNING ${listingSelect}`,
+      [input.name ?? null, input.type ?? null, input.location ?? null, input.text ?? null,
+        input.services ?? null, input.imageUrls ?? null, input.availability ?? null, user.role, listingId],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"listing.updated",subjectType:"listing",
+      subjectId:listingId,detail:{moderationStatus:result.rows[0].moderationStatus}});
+    return result.rows[0];
+  });
+  if(!updatedListing){response.status(404).json({error:"Listing not found."});return;}
+  response.json({ listing: updatedListing });
 }));
 
 app.post("/api/listings/:id/claim", requireUser, asyncRoute(async (request, response) => {
@@ -305,17 +318,19 @@ app.post("/api/listings/:id/claim", requireUser, asyncRoute(async (request, resp
     response.status(409).json({ error: "Your account already has a business profile. You cannot claim a second business." });
     return;
   }
-  const result = await query(
-    `UPDATE listings SET owner_id = $1, moderation_status = 'pending', verified = false
-     WHERE id = $2 AND owner_id IS NULL AND type = $3
-     RETURNING ${listingSelect}`,
-    [user.id, listingId, user.role === "technician" ? "technician" : "shop"],
-  );
-  if (!result.rows[0]) {
-    response.status(409).json({ error: "Listing is unavailable or does not match your provider role." });
-    return;
-  }
-  response.json({ listing: result.rows[0] });
+  const claimedListing = await withAuditTransaction(async client=>{
+    const result = await client.query(
+      `UPDATE listings SET owner_id = $1, moderation_status = 'pending', verified = false
+       WHERE id = $2 AND owner_id IS NULL AND type = $3 RETURNING ${listingSelect}`,
+      [user.id, listingId, user.role === "technician" ? "technician" : "shop"],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"listing.claimed",subjectType:"listing",
+      subjectId:listingId,detail:{role:user.role}});
+    return result.rows[0];
+  });
+  if(!claimedListing){response.status(409).json({error:"Listing is unavailable or does not match your provider role."});return;}
+  response.json({ listing: claimedListing });
 }));
 
 app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (request, response) => {
@@ -325,17 +340,23 @@ app.patch("/api/admin/listings/:id/moderation", requireUser, asyncRoute(async (r
     return;
   }
   const input = z.object({ moderationStatus: z.enum(["approved", "rejected", "pending"]) }).parse(request.body);
-  const result = await query(
-    `UPDATE listings SET moderation_status = $1, verified = CASE WHEN $1 = 'approved' THEN TRUE ELSE FALSE END
-     WHERE id = $2
-     RETURNING ${listingSelect}`,
-    [input.moderationStatus, String(request.params.id)],
-  );
-  if (!result.rows[0]) {
+  const listing = await withAuditTransaction(async (client) => {
+    const result = await client.query(
+      `UPDATE listings SET moderation_status = $1, verified = CASE WHEN $1 = 'approved' THEN TRUE ELSE FALSE END
+       WHERE id = $2 RETURNING ${listingSelect}`,
+      [input.moderationStatus, String(request.params.id)],
+    );
+    if (!result.rows[0]) return null;
+    await appendAudit(client, { actorId:user.id, action:"listing.moderated",
+      subjectType:"listing", subjectId:String(request.params.id),
+      detail:{status:input.moderationStatus} });
+    return result.rows[0];
+  });
+  if (!listing) {
     response.status(404).json({ error: "Listing not found." });
     return;
   }
-  response.json({ listing: result.rows[0] });
+  response.json({ listing });
 }));
 
 app.post("/api/reports", requireUser, asyncRoute(async (request, response) => {
@@ -346,14 +367,19 @@ app.post("/api/reports", requireUser, asyncRoute(async (request, response) => {
     reason: z.string().trim().min(2).max(120),
     details: z.string().trim().min(2).max(2000),
   }).parse(request.body);
-  const result = await query(
-    `INSERT INTO listing_reports (id, listing_id, reporter_id, reason, details)
-     VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
-     RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
-       created_at AS "createdAt"`,
-    [input.id ?? null, input.listingId, user.id, input.reason, input.details],
-  );
-  response.status(201).json({ report: result.rows[0] });
+  const report = await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `INSERT INTO listing_reports (id, listing_id, reporter_id, reason, details)
+       VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
+       RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+         created_at AS "createdAt"`,
+      [input.id ?? null, input.listingId, user.id, input.reason, input.details],
+    );
+    await appendAudit(client,{actorId:user.id,action:"report.created",subjectType:"report",
+      subjectId:result.rows[0].id,detail:{listingId:input.listingId,reason:input.reason}});
+    return result.rows[0];
+  });
+  response.status(201).json({ report });
 }));
 
 app.get("/api/admin/reports", requireUser, asyncRoute(async (_request, response) => {
@@ -376,17 +402,20 @@ app.patch("/api/admin/reports/:id", requireUser, asyncRoute(async (request, resp
     return;
   }
   const input = z.object({ status: z.enum(["open", "resolved", "dismissed"]) }).parse(request.body);
-  const result = await query(
-    `UPDATE listing_reports SET status = $1 WHERE id = $2
-     RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
-       created_at AS "createdAt"`,
-    [input.status, String(request.params.id)],
-  );
-  if (!result.rows[0]) {
-    response.status(404).json({ error: "Report not found." });
-    return;
-  }
-  response.json({ report: result.rows[0] });
+  const report = await withAuditTransaction(async (client) => {
+    const result = await client.query(
+      `UPDATE listing_reports SET status = $1 WHERE id = $2
+       RETURNING id, listing_id AS "listingId", reporter_id AS "reporterId", reason, details, status,
+         created_at AS "createdAt"`,
+      [input.status, String(request.params.id)],
+    );
+    if (!result.rows[0]) return null;
+    await appendAudit(client, {actorId:user.id,action:"report.moderated",subjectType:"report",
+      subjectId:String(request.params.id),detail:{status:input.status}});
+    return result.rows[0];
+  });
+  if (!report) { response.status(404).json({ error: "Report not found." }); return; }
+  response.json({ report });
 }));
 
 app.get("/api/admin/users", requireUser, asyncRoute(async (_request, response) => {
@@ -409,17 +438,40 @@ app.patch("/api/admin/users/:id", requireUser, asyncRoute(async (request, respon
     return;
   }
   const input = z.object({ verified: z.boolean().optional(), suspended: z.boolean().optional() }).refine((value) => value.verified !== undefined || value.suspended !== undefined).parse(request.body);
-  const result = await query<AuthUser>(
-    `UPDATE users SET verified = COALESCE($1, verified), suspended = COALESCE($2, suspended)
-     WHERE id = $3
-     RETURNING id, name, email, role, location, bio, verified, suspended`,
-    [input.verified ?? null, input.suspended ?? null, String(request.params.id)],
+  const updatedUser = await withAuditTransaction(async (client) => {
+    const result = await client.query<AuthUser>(
+      `UPDATE users SET verified = COALESCE($1, verified), suspended = COALESCE($2, suspended)
+       WHERE id = $3 RETURNING id, name, email, role, location, bio, verified, suspended`,
+      [input.verified ?? null, input.suspended ?? null, String(request.params.id)],
+    );
+    if (!result.rows[0]) return null;
+    await appendAudit(client, { actorId:actor.id, action:"user.admin_updated",
+      subjectType:"user",subjectId:String(request.params.id),
+      detail:{verified:result.rows[0].verified,suspended:result.rows[0].suspended} });
+    return result.rows[0];
+  });
+  if (!updatedUser) { response.status(404).json({ error: "User not found." }); return; }
+  response.json({ user: updatedUser });
+}));
+
+app.get("/api/admin/audit/integrity", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") { response.status(403).json({ error:"Administrator access required." }); return; }
+  const result = await verifyLedger();
+  response.status(result.valid ? 200 : 409).json(result);
+}));
+
+app.get("/api/admin/audit/ledger", requireUser, asyncRoute(async (_request, response) => {
+  const user = response.locals.user as AuthUser;
+  if (user.role !== "administrator") { response.status(403).json({ error:"Administrator access required." }); return; }
+  const result = await query(
+    `SELECT id::text,actor_id AS "actorId",action,subject_type AS "subjectType",
+       subject_id AS "subjectId",details,occurred_at AS "occurredAt",
+       previous_hash AS "previousHash",entry_hash AS "entryHash",
+       signature IS NOT NULL AS "signed",high_value AS "highValue"
+     FROM secure_audit_ledger ORDER BY id DESC LIMIT 200`,
   );
-  if (!result.rows[0]) {
-    response.status(404).json({ error: "User not found." });
-    return;
-  }
-  response.json({ user: result.rows[0] });
+  response.json({entries:result.rows});
 }));
 
 app.get("/api/admin/audit", requireUser, asyncRoute(async (_request, response) => {
@@ -428,9 +480,13 @@ app.get("/api/admin/audit", requireUser, asyncRoute(async (_request, response) =
     response.status(403).json({ error: "Administrator access required." });
     return;
   }
+  // The administrator dashboard now displays server-authored ledger entries,
+  // not client-provided legacy activity notes.
   const result = await query(
-    `SELECT id, actor_id AS "actorId", action, target, details, created_at AS "createdAt"
-     FROM audit_events ORDER BY created_at DESC LIMIT 200`,
+    `SELECT id::text AS id, COALESCE(actor_id::text,'system') AS "actorId",
+       action, subject_type || ':' || subject_id AS target,
+       details::text AS details, occurred_at AS "createdAt"
+     FROM secure_audit_ledger ORDER BY id DESC LIMIT 200`,
   );
   response.json({ events: result.rows });
 }));
@@ -470,16 +526,21 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
     response.status(404).json({ error: "Listing not found." });
     return;
   }
-  const result = await query(
-    `INSERT INTO service_requests
-      (customer_id, provider_id, listing_id, title, details, preferred_date, preferred_time)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
-       title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
-       confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
-    [user.id, listing.rows[0].owner_id, input.listingId, input.title, input.details, input.preferredDate || null, input.preferredTime || null],
-  );
-  response.status(201).json({ request: result.rows[0] });
+  const createdRequest = await withAuditTransaction(async client=>{
+    const result = await client.query(
+      `INSERT INTO service_requests
+        (customer_id, provider_id, listing_id, title, details, preferred_date, preferred_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
+         title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
+         confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
+      [user.id, listing.rows[0].owner_id, input.listingId, input.title, input.details, input.preferredDate || null, input.preferredTime || null],
+    );
+    await appendAudit(client,{actorId:user.id,action:"service_request.created",
+      subjectType:"service_request",subjectId:result.rows[0].id,detail:{listingId:input.listingId}});
+    return result.rows[0];
+  });
+  response.status(201).json({ request: createdRequest });
   if (listing.rows[0].owner_id) {
     await createNotification(listing.rows[0].owner_id, "New service request", input.title);
   }
@@ -535,16 +596,23 @@ app.patch("/api/requests/:id/status", requireUser, asyncRoute(async (request, re
     response.status(403).json({ error: "Only the customer can cancel this request." });
     return;
   }
-  const result = await query(
-    `UPDATE service_requests SET status = $1 WHERE id = $2
-     RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
-       title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
-       confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
-    [input.status, requestId],
-  );
-  response.json({ request: result.rows[0] });
+  const changedRequest=await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `UPDATE service_requests SET status = $1 WHERE id = $2
+       RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
+         title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
+         confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
+      [input.status, requestId],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"service_request.status_updated",
+      subjectType:"service_request",subjectId:requestId,detail:{status:input.status}});
+    return result.rows[0];
+  });
+  if(!changedRequest){response.status(404).json({error:"Request not found."});return;}
+  response.json({request:changedRequest});
   if (input.status !== "cancelled" && item.customer_id !== user.id) {
-    await createNotification(item.customer_id, `Request ${input.status}`, result.rows[0].title);
+    await createNotification(item.customer_id, `Request ${input.status}`, changedRequest.title);
   }
 }));
 
@@ -564,16 +632,24 @@ app.patch("/api/requests/:id/appointment", requireUser, asyncRoute(async (reques
     response.status(403).json({ error: "Only the assigned provider can confirm an appointment." });
     return;
   }
-  const result = await query(
-    `UPDATE service_requests SET confirmed_date = $1, confirmed_time = $2 WHERE id = $3
-     RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
-       title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
-       confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
-    [input.confirmedDate, input.confirmedTime || null, requestId],
-  );
-  response.json({ request: result.rows[0] });
+  const appointment = await withAuditTransaction(async client=>{
+    const result=await client.query(
+      `UPDATE service_requests SET confirmed_date = $1, confirmed_time = $2 WHERE id = $3
+       RETURNING id, customer_id AS "customerId", provider_id AS "providerId", listing_id AS "listingId",
+         title, details, status, preferred_date AS "preferredDate", preferred_time AS "preferredTime",
+         confirmed_date AS "confirmedDate", confirmed_time AS "confirmedTime", created_at AS "createdAt"`,
+      [input.confirmedDate, input.confirmedTime || null, requestId],
+    );
+    if(!result.rows[0])return null;
+    await appendAudit(client,{actorId:user.id,action:"service_request.appointment_confirmed",
+      subjectType:"service_request",subjectId:requestId,
+      detail:{date:input.confirmedDate,time:input.confirmedTime||null}});
+    return result.rows[0];
+  });
+  if(!appointment){response.status(404).json({error:"Request not found."});return;}
+  response.json({request:appointment});
   if (item.customer_id !== user.id) {
-    await createNotification(item.customer_id, "Appointment confirmed", `${result.rows[0].title} · ${input.confirmedDate}${input.confirmedTime ? ` at ${input.confirmedTime}` : ""}`);
+    await createNotification(item.customer_id, "Appointment confirmed", `${appointment.title} · ${input.confirmedDate}${input.confirmedTime ? ` at ${input.confirmedTime}` : ""}`);
   }
 }));
 

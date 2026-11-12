@@ -1,10 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { currentUser, type AuthUser } from "./auth.js";
 import { pool, query } from "./db.js";
 import { config } from "./config.js";
 import { createNotification } from "./notifications.js";
+import { appendAudit, highValueThreshold, withAuditTransaction } from "./auditLedger.js";
 
 export const commerceRouter = Router();
 const asyncRoute = (handler: (req: Request, res: Response) => Promise<void>) =>
@@ -102,20 +103,34 @@ commerceRouter.post("/my-products", protect, asyncRoute(async (req,res)=>{
   const data=managedItemSchema.omit({active:true}).parse(req.body);
   const business=await query<{id:string}>('SELECT id FROM listings WHERE owner_id=$1 ORDER BY created_at ASC LIMIT 1',[user.id]);
   if (!business.rows[0]){res.status(409).json({error:"Create your business profile before adding inventory."});return;}
-  const result=await query('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,image_urls,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,TRUE) RETURNING id',
-    [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrls[0],data.imageUrls,data.condition,data.compatibility]);
-  res.status(201).json({id:result.rows[0].id});
+  const productId=await withAuditTransaction(async client=>{
+    const result=await client.query<{id:string}>('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,image_urls,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,TRUE) RETURNING id',
+      [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrls[0],data.imageUrls,data.condition,data.compatibility]);
+    const id=result.rows[0].id;
+    await appendAudit(client,{actorId:user.id,action:"product.created",subjectType:"product",subjectId:id,
+      detail:{priceUgx:data.priceUgx,availableUnits:data.availableUnits}});
+    return id;
+  });
+  res.status(201).json({id:productId});
 }));
 commerceRouter.patch("/my-products/:id",protect,asyncRoute(async (req,res)=>{
   const user=res.locals.user as AuthUser;
   if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
   const id=z.string().uuid().parse(req.params.id);
   const data=managedItemSchema.partial().parse(req.body);
-  const result=await query(
-    "UPDATE marketplace_products SET name=COALESCE($1,name),description=COALESCE($2,description),category=COALESCE($3,category),price_ugx=COALESCE($4,price_ugx),available_units=COALESCE($5,available_units),image_url=COALESCE($6,image_url),image_urls=COALESCE($7,image_urls),condition=COALESCE($8,condition),compatibility=COALESCE($9,compatibility),active=COALESCE($10,active) WHERE id=$11 AND owner_id=$12 AND is_demo=FALSE RETURNING id",
-    [data.name??null,data.description??null,data.category??null,data.priceUgx??null,data.availableUnits??null,data.imageUrls?.[0]??null,data.imageUrls??null,data.condition??null,data.compatibility??null,data.active??null,id,user.id],
-  );
-  if(!result.rowCount){res.status(404).json({error:"Product not found in your business."});return;}
+  const updated=await withAuditTransaction(async client=>{
+    const result=await client.query(
+      "UPDATE marketplace_products SET name=COALESCE($1,name),description=COALESCE($2,description),category=COALESCE($3,category),price_ugx=COALESCE($4,price_ugx),available_units=COALESCE($5,available_units),image_url=COALESCE($6,image_url),image_urls=COALESCE($7,image_urls),condition=COALESCE($8,condition),compatibility=COALESCE($9,compatibility),active=COALESCE($10,active) WHERE id=$11 AND owner_id=$12 AND is_demo=FALSE RETURNING id",
+      [data.name??null,data.description??null,data.category??null,data.priceUgx??null,data.availableUnits??null,data.imageUrls?.[0]??null,data.imageUrls??null,data.condition??null,data.compatibility??null,data.active??null,id,user.id],
+    );
+    if(!result.rowCount)return false;
+    await appendAudit(client,{actorId:user.id,action:"product.updated",subjectType:"product",subjectId:id,
+      detail:{...(data.priceUgx!==undefined?{priceUgx:data.priceUgx}:{}),
+        ...(data.availableUnits!==undefined?{availableUnits:data.availableUnits}:{}),
+        ...(data.active!==undefined?{active:data.active}:{})}});
+    return true;
+  });
+  if(!updated){res.status(404).json({error:"Product not found in your business."});return;}
   res.json({id});
 }));
 commerceRouter.get("/orders", protect, asyncRoute(async (_req, res) => {
@@ -176,6 +191,15 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
       "INSERT INTO marketplace_order_items(order_id,product_id,quantity,price_ugx,product_name) VALUES($1,$2,$3,$4,$5)",
       [orderId,product.id,combined.get(product.id),product.price_ugx,product.name],
     );
+    // Bind the receipt to the complete product/quantity/price snapshot without
+    // exposing the customer's phone number or other private payment information.
+    const itemsSnapshot=found.rows.map(product=>({
+      productId:product.id,quantity:combined.get(product.id)!,unitPriceUgx:product.price_ugx,
+    })).sort((a,b)=>a.productId.localeCompare(b.productId));
+    const itemsHash=createHash("sha256").update(JSON.stringify(itemsSnapshot)).digest("hex");
+    await appendAudit(client, {actorId:user.id,action:"order.created",subjectType:"order",subjectId:orderId,
+      detail:{amountUgx:total,status,paymentMethod:input.paymentMethod,itemCount:combined.size,itemsHash},
+      highValue:total>=highValueThreshold});
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
@@ -215,9 +239,22 @@ commerceRouter.post("/orders/:id/pay", protect, asyncRoute(async (req,res) => {
     }),
   });
   if(typeof result.order_tracking_id !== "string" || typeof result.redirect_url !== "string") throw new Error("Payment gateway did not provide a checkout link.");
+  const trackingId: string = result.order_tracking_id;
   const url = new URL(result.redirect_url);
   if (!["cybqa.pesapal.com","pay.pesapal.com"].includes(url.hostname) || url.protocol!=="https:") throw new Error("Unexpected payment destination.");
-  await query("UPDATE marketplace_orders SET payment_tracking_id=$1 WHERE id=$2 AND payment_tracking_id IS NULL",[result.order_tracking_id,id]);
+  const recorded=await withAuditTransaction(async client=>{
+    const changed=await client.query(
+      "UPDATE marketplace_orders SET payment_tracking_id=$1 WHERE id=$2 AND payment_tracking_id IS NULL AND status='pending_payment' RETURNING id",
+      [trackingId,id],
+    );
+    if(!changed.rowCount)return false;
+    await appendAudit(client,{actorId:user.id,action:"payment.initiated",
+      subjectType:"order",subjectId:id,detail:{amountUgx:item.amount_ugx,
+        trackingHash:createHash("sha256").update(trackingId).digest("hex")},
+      highValue:Number(item.amount_ugx)>=highValueThreshold});
+    return true;
+  });
+  if(!recorded){res.status(409).json({error:"Payment was already initiated. Check order status instead."});return;}
   res.json({redirectUrl:url.toString()});
 }));
 
@@ -235,11 +272,17 @@ const syncPayment = async (trackingId:string) => {
   if(state==="COMPLETED") {
     // Sandbox payments are never recognized as real funds or deducted from live stock.
     if (process.env.PESAPAL_ENV !== "live") {
-      const test = await query(
-        "UPDATE marketplace_orders SET status='sandbox_paid' WHERE id=$1 AND status='pending_payment' RETURNING id",
-        [order.id],
-      );
-      if (test.rowCount) await createNotification(order.customer_id,"Sandbox payment verified — test only","GURA test order "+order.id.slice(0,8).toUpperCase()+" completed in the payment sandbox. No real money was collected and no stock was deducted.");
+      const changed = await withAuditTransaction(async client => {
+        const test = await client.query(
+          "UPDATE marketplace_orders SET status='sandbox_paid' WHERE id=$1 AND status='pending_payment' RETURNING id",
+          [order.id],
+        );
+        if (test.rowCount) await appendAudit(client,{actorId:null,action:"payment.sandbox_confirmed",
+          subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"sandbox_paid"},
+          highValue:Number(order.amount_ugx)>=highValueThreshold});
+        return !!test.rowCount;
+      });
+      if (changed) await createNotification(order.customer_id,"Sandbox payment verified — test only","GURA test order "+order.id.slice(0,8).toUpperCase()+" completed in the payment sandbox. No real money was collected and no stock was deducted.");
       return;
     }
     const client=await pool.connect();
@@ -254,16 +297,42 @@ const syncPayment = async (trackingId:string) => {
           if(!updated.rowCount) throw new Error("Insufficient inventory to fulfill paid order "+order.id);
         }
         await client.query("UPDATE marketplace_orders SET status='paid',paid_at=now() WHERE id=$1",[order.id]);
+        await appendAudit(client,{actorId:null,action:"payment.confirmed",
+          subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"paid"},
+          highValue:Number(order.amount_ugx)>=highValueThreshold});
         success=true;
       }
       await client.query("COMMIT");
     }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
     if(success) await createNotification(order.customer_id,"Payment confirmed — order received","Payment verified for GURA order "+order.id.slice(0,8).toUpperCase()+". We have received your order.");
   } else if(state==="FAILED"||state==="REVERSED"){
-    await query("UPDATE marketplace_orders SET status='failed' WHERE id=$1 AND status='pending_payment'",[order.id]);
+    await withAuditTransaction(async client=>{
+      const result=await client.query("UPDATE marketplace_orders SET status='failed' WHERE id=$1 AND status='pending_payment' RETURNING id",[order.id]);
+      if(result.rowCount) await appendAudit(client,{actorId:null,action:"payment.failed",
+        subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"failed"},
+        highValue:Number(order.amount_ugx)>=highValueThreshold});
+    });
     await createNotification(order.customer_id,"Order payment "+state.toLowerCase(),"Payment for order "+order.id.slice(0,8).toUpperCase()+" was not confirmed.");
   }
 };
+// An order owner can download the evidence hashes and proof tags. HMAC verification
+// itself is server-side; unlike a customer-held digital signature, this is not
+// independent proof that the human account owner authorized the purchase.
+commerceRouter.get("/orders/:id/audit-receipt", protect, asyncRoute(async (req,res)=>{
+  const user=res.locals.user as AuthUser;
+  const id=z.string().uuid().parse(req.params.id);
+  const owned=await query("SELECT id FROM marketplace_orders WHERE id=$1 AND customer_id=$2",[id,user.id]);
+  if(!owned.rowCount){res.status(404).json({error:"Order not found."});return;}
+  const evidence=await query(
+    `SELECT id::text,action,subject_id AS "orderId",details,occurred_at AS "occurredAt",
+       previous_hash AS "previousHash",entry_hash AS "entryHash",signature,
+       high_value AS "highValue"
+     FROM secure_audit_ledger WHERE subject_type='order' AND subject_id=$1 ORDER BY id`,
+    [id],
+  );
+  res.json({orderId:id,entries:evidence.rows});
+}));
+
 commerceRouter.get("/orders/:id/verify", protect, asyncRoute(async (req,res)=>{
   const user=res.locals.user as AuthUser;
   const id=z.string().uuid().parse(req.params.id);
