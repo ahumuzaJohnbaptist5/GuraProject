@@ -1065,3 +1065,12 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell .gura-shop-provider-info .gura-unverified{justify-self:start}
 @media(max-width:850px){.app-shell .gura-shop-providers{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.app-shell .gura-shop-providers{grid-template-columns:1fr}.app-shell .gura-shop-provider>img,.app-shell .gura-shop-provider-placeholder{height:190px}}
+
+/* Supplier-discovery section replaces sample product displays on the GURA homepage. */
+.app-shell .gura-tech-discovery{margin-top:52px;margin-bottom:20px;padding:38px 40px;border-radius:10px;background:linear-gradient(110deg,#09232b,#153a43);color:#f4f8f9}
+.app-shell .gura-tech-discovery h2{color:#fff;font-size:clamp(24px,3vw,37px);max-width:720px;line-height:1.2;margin:13px 0}
+.app-shell .gura-tech-discovery p{color:#c5d3d7;font-size:14px;line-height:1.65;max-width:660px}
+.app-shell .gura-tech-discovery-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:23px}
+.app-shell .gura-tech-discovery-actions a{display:inline-flex;gap:9px;align-items:center;padding:13px 17px;background:#f87a3b;color:#10232a;font-weight:800;font-size:13px}
+.app-shell .gura-tech-discovery-actions a+a{background:transparent;color:#fff;border:1px solid #779096}
+@media(max-width:720px){.app-shell .gura-tech-discovery{padding:27px 22px;margin-top:34px}}

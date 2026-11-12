@@ -48,4 +48,4 @@ jobs:
           node dist/index.js &
           sleep 3
           curl --fail --silent http://127.0.0.1:8787/health | grep '"ok":true'
-          curl --fail --silent http://127.0.0.1:8787/api/commerce/products | grep 'GURA-DEMO-RAM'
+          node -e 'fetch("http://127.0.0.1:8787/api/commerce/products").then(r => r.json()).then(d => { if (!Array.isArray(d.products) || d.products.some(p => p.isDemo)) process.exit(1); }).catch(() => process.exit(1))'

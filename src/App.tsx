@@ -49,12 +49,6 @@ function FreshHome() {
     { title: "Chargers & Power", detail: "Batteries, adapters and cables", keyword: "charger", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=640&q=80" },
     { title: "Repair & Tools", detail: "Technicians and repair equipment", keyword: "repair", image: "https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=640&q=80" },
   ];
-  const samples = [
-    { id: "11111111-1111-4111-8111-111111111101", name: '14-inch Laptop Replacement Display', compatibility: "Check connector and laptop model", price: "UGX 180,000", condition: "NEW", image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=760&q=85" },
-    { id: "11111111-1111-4111-8111-111111111102", name: "8GB DDR4 Laptop Memory", compatibility: "Confirm speed and device support", price: "UGX 85,000", condition: "REFURBISHED", image: "https://images.unsplash.com/photo-1541029071515-84cc54f84dc5?auto=format&fit=crop&w=760&q=85" },
-    { id: "11111111-1111-4111-8111-111111111103", name: "512GB Solid-State Drive", compatibility: "Check SATA / NVMe compatibility", price: "UGX 145,000", condition: "NEW", image: "https://images.unsplash.com/photo-1531492746076-161ca9bcad58?auto=format&fit=crop&w=760&q=85" },
-    { id: "11111111-1111-4111-8111-111111111104", name: "Laptop Power Adapter", compatibility: "Match voltage and connector", price: "UGX 65,000", condition: "NEW", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=760&q=85" },
-  ];
   const searchFor = (keyword: string, chosenLocation = location) => {
     const params = new URLSearchParams();
     if (keyword.trim()) params.set("q", keyword.trim());
@@ -101,11 +95,12 @@ function FreshHome() {
         <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">DISCOVER WHAT YOU NEED</span><h2>Explore electronics & parts</h2><p>Start with a category, then connect with shops and repair professionals.</p></div><Link to="/directory">Browse all <ArrowRight size={17}/></Link></div>
         <div className="gura-tech-categories">{categories.map(category=><Link to={"/directory?q="+encodeURIComponent(category.keyword)} className="gura-tech-category" key={category.title}><img src={category.image} alt="" loading="lazy"/><div><strong>{category.title}</strong><small>{category.detail}</small></div><ArrowRight size={17} aria-hidden="true"/></Link>)}</div>
       </div>
-      <div className="container gura-tech-section">
-        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">A GLIMPSE OF GURA</span><h2>Parts you'll be able to source</h2><p>Realistic product photography and sample prices for the marketplace preview.</p></div><span className="gura-tech-demo-tag">DEMO PRODUCTS</span></div>
-        <div className="gura-tech-products">{samples.map(sample=><article className="gura-tech-product" key={sample.name}><div className="gura-tech-product-image"><img src={sample.image} alt={"Illustrative product category photo for "+sample.name} loading="lazy"/><span>DEMO</span></div><div className="gura-tech-product-body"><small className="gura-tech-condition">{sample.condition}</small><h3>{sample.name}</h3><p>{sample.compatibility}</p><strong>{sample.price}</strong><Link className="gura-tech-product-link" to={"/shop/product/"+sample.id}>View details & stock <ArrowRight size={16}/></Link></div></article>)}</div>
-        <p className="gura-tech-demo-note">These images and prices are examples for design preview only, not live product offers, verified stock or confirmed supplier listings.</p>
-      </div>
+      <section className="container gura-tech-discovery" aria-label="Find local electronics suppliers">
+        <span className="gura-tech-overline">LOCAL ELECTRONICS NETWORK</span>
+        <h2>Discover suppliers, find parts, and connect with technicians.</h2>
+        <p>Browse business listings with genuine provider-uploaded photos. Each listing clearly displays its current verification status.</p>
+        <div className="gura-tech-discovery-actions"><Link to="/shop">Explore marketplace <ArrowRight size={17}/></Link><Link to="/directory?type=shop">Find shops and suppliers <ArrowRight size={17}/></Link></div>
+      </section>
       <div className="container gura-tech-request" id="urgent-requests"><div><span className="gura-tech-overline">CAN'T FIND IT?</span><h2>Missing a part? Find someone who can help.</h2><p>Browse nearby suppliers or describe your need in a service request to a listed provider.</p></div><Link to="/directory">Find a supplier <ArrowRight size={18}/></Link></div>
       <div className="container gura-tech-benefits"><div><ShieldCheck size={24}/><span><strong>Built around trust</strong><small>Verification and moderation tools for business profiles.</small></span></div><div><MessageCircle size={24}/><span><strong>Connect directly</strong><small>Start a service inquiry with a local provider.</small></span></div><div><MapPin size={24}/><span><strong>Made for local sourcing</strong><small>Discover services and shops by location.</small></span></div></div>
     </section>
