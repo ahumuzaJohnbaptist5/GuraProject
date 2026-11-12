@@ -8,6 +8,9 @@ export type User = {
   location?: string;
   bio?: string;
   locationImages?: string[];
+  businessPhone?: string;
+  businessWhatsapp?: string;
+  businessEmail?: string;
   verified?: boolean;
   suspended?: boolean;
 };
@@ -20,6 +23,7 @@ export type AuthAdapter = {
   logout: () => Promise<void>;
   getCurrentUser: () => User | null;
   saveProfile: (profile: Partial<User>) => Promise<User>;
+  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
 };
 
 export type ListingType = "technician" | "shop" | "seller";
@@ -38,6 +42,9 @@ export type Listing = {
   rating: number;
   availability?: string;
   moderationStatus?: "pending" | "approved" | "rejected";
+  businessPhone?: string;
+  businessWhatsapp?: string;
+  businessEmail?: string;
 };
 
 export type ServiceRequest = {
