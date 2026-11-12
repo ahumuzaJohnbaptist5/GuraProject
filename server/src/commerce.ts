@@ -302,6 +302,24 @@ const syncPayment = async (trackingId:string) => {
     await createNotification(order.customer_id,"Order payment "+state.toLowerCase(),"Payment for order "+order.id.slice(0,8).toUpperCase()+" was not confirmed.");
   }
 };
+// An order owner can download the evidence hashes and proof tags. HMAC verification
+// itself is server-side; unlike a customer-held digital signature, this is not
+// independent proof that the human account owner authorized the purchase.
+commerceRouter.get("/orders/:id/audit-receipt", protect, asyncRoute(async (req,res)=>{
+  const user=res.locals.user as AuthUser;
+  const id=z.string().uuid().parse(req.params.id);
+  const owned=await query("SELECT id FROM marketplace_orders WHERE id=$1 AND customer_id=$2",[id,user.id]);
+  if(!owned.rowCount){res.status(404).json({error:"Order not found."});return;}
+  const evidence=await query(
+    `SELECT id::text,action,subject_id AS "orderId",details,occurred_at AS "occurredAt",
+       previous_hash AS "previousHash",entry_hash AS "entryHash",signature,
+       high_value AS "highValue"
+     FROM secure_audit_ledger WHERE subject_type='order' AND subject_id=$1 ORDER BY id`,
+    [id],
+  );
+  res.json({orderId:id,entries:evidence.rows});
+}));
+
 commerceRouter.get("/orders/:id/verify", protect, asyncRoute(async (req,res)=>{
   const user=res.locals.user as AuthUser;
   const id=z.string().uuid().parse(req.params.id);
