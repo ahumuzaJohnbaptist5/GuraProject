@@ -38,72 +38,112 @@ function Layout({ children, user, onLogout }: { children: React.ReactNode; user:
     </footer>
   </div>;
 }
+type HomeProduct = {
+  id:string; name:string; description:string; category:string; priceUgx:number; availableUnits:number;
+  imageUrl:string; imageUrls?:string[]; condition:string; isDemo:boolean; sellerVerified:boolean; businessName?:string;
+};
+type HomeBusiness = {
+  id:string; name:string; type:string; location:string; images?:string[];
+  verified:boolean; moderationStatus:string; text:string;
+};
 function FreshHome() {
   const navigate = useNavigate();
-  const [part, setPart] = useState("");
-  const [location, setLocation] = useState("");
-  const categories = [
-    { title: "Laptops & Devices", detail: "Computers, tablets and phones", keyword: "laptop", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=640&q=80" },
-    { title: "RAM & Memory", detail: "DDR3, DDR4 and DDR5", keyword: "RAM", image: "https://images.unsplash.com/photo-1541029071515-84cc54f84dc5?auto=format&fit=crop&w=640&q=80" },
-    { title: "SSDs & Storage", detail: "SSDs, NVMe and hard drives", keyword: "SSD", image: "https://images.unsplash.com/photo-1531492746076-161ca9bcad58?auto=format&fit=crop&w=640&q=80" },
-    { title: "Screens & Displays", detail: "Replacement panels and monitors", keyword: "screen", image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=640&q=80" },
-    { title: "Chargers & Power", detail: "Batteries, adapters and cables", keyword: "charger", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=640&q=80" },
-    { title: "Repair & Tools", detail: "Technicians and repair equipment", keyword: "repair", image: "https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=640&q=80" },
-  ];
-  const searchFor = (keyword: string, chosenLocation = location) => {
-    const params = new URLSearchParams();
-    if (keyword.trim()) params.set("q", keyword.trim());
-    if (chosenLocation) params.set("location", chosenLocation);
-    navigate("/directory" + (params.toString() ? "?" + params.toString() : ""));
-  };
-  const search = (event: React.FormEvent<HTMLFormElement>) => {
+  const [part,setPart]=useState("");
+  const [products,setProducts]=useState<HomeProduct[]>([]);
+  const [businesses,setBusinesses]=useState<HomeBusiness[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    const load=async()=>{
+      const results=await Promise.allSettled([
+        fetch("/api/commerce/products",{credentials:"include",cache:"no-store"}).then(async res=>{if(!res.ok)throw new Error("Products are temporarily unavailable.");return await res.json() as {products:HomeProduct[]}}),
+        fetch("/api/listings",{credentials:"include",cache:"no-store"}).then(async res=>{if(!res.ok)throw new Error("Business listings are temporarily unavailable.");return await res.json() as {listings:HomeBusiness[]}}),
+      ]);
+      if(!active)return;
+      if(results[0].status==="fulfilled")setProducts(results[0].value.products.filter(item=>!item.isDemo));
+      if(results[1].status==="fulfilled")setBusinesses(results[1].value.listings.filter(item=>item.moderationStatus!=="rejected"));
+      if(results[0].status==="rejected"&&results[1].status==="rejected")setError("The marketplace is temporarily unavailable. Please try again.");
+      else if(results[0].status==="rejected")setError("Products are temporarily unavailable; business listings can still be browsed.");
+      else if(results[1].status==="rejected")setError("Business profiles are temporarily unavailable; products can still be browsed.");
+      setLoading(false);
+    };
+    void load();
+    return()=>{active=false};
+  },[]);
+  const categories=Array.from(new Map(products.map(p=>[p.category,p])).entries()).map(([name,product])=>({name,photo:product.imageUrl,count:products.filter(p=>p.category===name).length}));
+  const featured=products.slice(0,8);
+  const suppliers=businesses.slice(0,4);
+  const money=(value:number)=>"UGX "+value.toLocaleString("en-UG");
+  const search=(event:React.FormEvent<HTMLFormElement>)=>{
     event.preventDefault();
-    searchFor(part);
+    navigate("/shop"+(part.trim()?"?q="+encodeURIComponent(part.trim()):""));
   };
-  return <main className="gura-tech-home">
+  return <main className="gura-tech-home gura-live-home">
     <section className="gura-tech-hero" aria-labelledby="gura-tech-heading">
       <div className="container gura-tech-hero-inner">
         <div className="gura-tech-hero-content">
-          <span className="gura-tech-kicker">BUILT IN KABALE, UGANDA <span aria-label="Uganda">🇺🇬</span></span>
+          <span className="gura-tech-kicker">GURA ELECTRONICS MARKETPLACE</span>
           <h1 id="gura-tech-heading">FIND THE<br/>MISSING <em>PIECE.</em><br/>FINISH THE JOB.</h1>
-          <p className="gura-tech-intro">The parts and electronics network for Uganda's repair community. Don't turn customers away — discover who may have what you need.</p>
+          <p className="gura-tech-intro">Browse real products and business listings uploaded by shops and technicians. See prices, available units, photos and seller verification status.</p>
           <form className="gura-tech-search" role="search" onSubmit={search}>
-            <label className="gura-tech-search-field"><Search size={21} aria-hidden="true"/><span className="sr-only">Search parts and suppliers</span><input value={part} onChange={event=>setPart(event.target.value)} placeholder="e.g., DDR4 8GB RAM, HP Envy screen..." aria-label="Search parts and suppliers"/></label>
-            <label className="gura-tech-search-location"><MapPin size={18} aria-hidden="true"/><span className="sr-only">Select location</span><select value={location} onChange={event=>setLocation(event.target.value)} aria-label="Location"><option value="">All Uganda</option><option value="Kabale">Kabale</option><option value="Mbarara">Mbarara</option><option value="Kampala">Kampala</option><option value="Fort Portal">Fort Portal</option><option value="Ntungamo">Ntungamo</option></select></label>
-            <button className="gura-tech-search-submit" type="submit">SEARCH <ArrowRight size={20}/></button>
+            <label className="gura-tech-search-field"><Search size={21} aria-hidden="true"/><span className="sr-only">Search marketplace products</span><input value={part} onChange={event=>setPart(event.target.value)} placeholder="Search products, parts, accessories..." aria-label="Search marketplace products"/></label>
+            <button className="gura-tech-search-submit" type="submit">SEARCH PRODUCTS <ArrowRight size={20}/></button>
           </form>
-          <div className="gura-tech-quick"><strong>QUICK SHOUTS:</strong>{["DDR4 RAM", "MACBOOK CHARGER", "THERMAL PASTE", "SSD 256GB", "HP BATTERY"].map(keyword=><button key={keyword} type="button" onClick={()=>searchFor(keyword)}>{keyword}</button>)}</div>
-          <p className="gura-tech-search-note">Search currently matches local business and service listings. Live product inventory is being developed.</p>
+          <p className="gura-tech-search-note">Items and quantities are provided by registered GURA businesses. A Not Yet Verified badge means the business has not been approved by GURA.</p>
         </div>
-        <div className="gura-tech-hero-aside" aria-label="GURA marketplace features">
-          <span className="gura-tech-aside-overline">THE GURA NETWORK</span>
-          <h2>Source smarter.<br/><span>Repair faster.</span></h2>
-          <div><ShieldCheck size={19}/><span>Discover business profiles</span></div>
-          <div><Store size={19}/><span>Connect with local suppliers</span></div>
-          <div><Wrench size={19}/><span>Find technical assistance</span></div>
-          <Link to="/directory">Explore the network <ArrowRight size={17}/></Link>
+        <div className="gura-live-hero-aside" aria-label="Marketplace availability">
+          <span className="gura-tech-aside-overline">FROM THE MARKETPLACE</span>
+          {loading?<p>Loading real listings...</p>:featured[0]?<>
+            <Link className="gura-live-hero-image" to={"/shop/product/"+featured[0].id}><img src={featured[0].imageUrl} alt={featured[0].name}/></Link>
+            <h2>{featured[0].name}</h2>
+            <strong>{money(featured[0].priceUgx)}</strong>
+            <p>{featured[0].sellerVerified?"Verified seller":"Not Yet Verified"} · {featured[0].availableUnits} available</p>
+            <Link className="gura-live-item-link" to={"/shop/product/"+featured[0].id}>View product details <ArrowRight size={16}/></Link>
+          </>:suppliers[0]?<>
+            {suppliers[0].images?.[0]&&<img className="gura-live-hero-image-static" src={suppliers[0].images[0]} alt={suppliers[0].name}/>}
+            <h2>{suppliers[0].name}</h2><p>{suppliers[0].location} · {suppliers[0].verified?"Verified":"Not Yet Verified"}</p>
+            <Link className="gura-live-item-link" to={"/directory?q="+encodeURIComponent(suppliers[0].name)}>View business <ArrowRight size={16}/></Link>
+          </>:<><h2>Discover local electronics businesses</h2><p>New supplier products will appear here as they are published.</p><Link className="gura-live-item-link" to="/directory">Browse businesses <ArrowRight size={16}/></Link></>}
         </div>
       </div>
-      <div className="container gura-tech-proof" aria-label="Marketplace highlights">
-        <div><strong>LOCAL</strong><span>BUILT FOR UGANDA</span></div>
-        <div><strong>TECH</strong><span>REPAIR COMMUNITY</span></div>
-        <div><strong>PARTS</strong><span>DISCOVER & SOURCE</span></div>
-        <div><strong>ONE</strong><span>CONNECTED NETWORK</span></div>
-      </div>
+      {!loading&&<div className="container gura-live-counts" aria-label="Live marketplace overview">
+        <span><strong>{products.length}</strong> listed products</span>
+        <span><strong>{businesses.length}</strong> listed businesses</span>
+        <span><strong>{businesses.filter(b=>b.verified&&b.moderationStatus==="approved").length}</strong> verified businesses</span>
+      </div>}
     </section>
     <section className="gura-tech-content">
+      {error&&<div className="container"><p className="gura-live-error" role="alert">{error}</p></div>}
       <div className="container gura-tech-section">
-        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">DISCOVER WHAT YOU NEED</span><h2>Explore electronics & parts</h2><p>Start with a category, then connect with shops and repair professionals.</p></div><Link to="/directory">Browse all <ArrowRight size={17}/></Link></div>
-        <div className="gura-tech-categories">{categories.map(category=><Link to={"/directory?q="+encodeURIComponent(category.keyword)} className="gura-tech-category" key={category.title}><img src={category.image} alt="" loading="lazy"/><div><strong>{category.title}</strong><small>{category.detail}</small></div><ArrowRight size={17} aria-hidden="true"/></Link>)}</div>
+        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">PRODUCTS FROM GURA SELLERS</span><h2>Latest products</h2><p>Photos, prices and stock are taken directly from provider listings.</p></div><Link to="/shop">All products <ArrowRight size={17}/></Link></div>
+        {loading?<p className="gura-live-loading">Loading products...</p>:featured.length?<div className="gura-live-product-grid">
+          {featured.map(product=><article className="gura-live-product" key={product.id}>
+            <Link className="gura-live-product-photo" to={"/shop/product/"+product.id}><img loading="lazy" src={product.imageUrl} alt={product.name}/></Link>
+            <div className="gura-live-product-body">
+              <small>{product.category} · {product.condition}</small>
+              <Link to={"/shop/product/"+product.id}><h3>{product.name}</h3></Link>
+              <strong>{money(product.priceUgx)}</strong>
+              <span className={product.sellerVerified?"gura-live-verified":"gura-live-unverified"}>{product.sellerVerified?<ShieldCheck size={14}/>:null}{product.sellerVerified?"Verified seller":"Not Yet Verified"}</span>
+              <p>{product.availableUnits} available{product.businessName?" · "+product.businessName:""}</p>
+              <Link className="gura-live-view" to={"/shop/product/"+product.id}>View details <ArrowRight size={15}/></Link>
+            </div>
+          </article>)}
+        </div>:<div className="gura-live-empty"><Store size={30}/><h3>No products have been published yet</h3><p>New products uploaded by real shops and technicians will appear here automatically.</p><Link to="/directory">Browse business listings <ArrowRight size={15}/></Link></div>}
       </div>
-      <section className="container gura-tech-discovery" aria-label="Find local electronics suppliers">
-        <span className="gura-tech-overline">LOCAL ELECTRONICS NETWORK</span>
-        <h2>Discover suppliers, find parts, and connect with technicians.</h2>
-        <p>Browse business listings with genuine provider-uploaded photos. Each listing clearly displays its current verification status.</p>
-        <div className="gura-tech-discovery-actions"><Link to="/shop">Explore marketplace <ArrowRight size={17}/></Link><Link to="/directory?type=shop">Find shops and suppliers <ArrowRight size={17}/></Link></div>
+      {!!categories.length&&<section className="container gura-tech-section gura-live-category-section">
+        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">BASED ON LISTED INVENTORY</span><h2>Shop by category</h2></div></div>
+        <div className="gura-live-categories">{categories.map(category=><Link to={"/shop?category="+encodeURIComponent(category.name)} key={category.name} className="gura-live-category">
+          <img src={category.photo} alt=""/><span><strong>{category.name}</strong><small>{category.count} {category.count===1?"product":"products"}</small></span><ArrowRight size={16}/>
+        </Link>)}</div>
+      </section>}
+      <section className="container gura-tech-section gura-live-providers">
+        <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">REAL REGISTERED BUSINESSES</span><h2>Shops and technicians</h2><p>View business-uploaded photos, locations and verification status.</p></div><Link to="/directory">All businesses <ArrowRight size={17}/></Link></div>
+        {loading?<p className="gura-live-loading">Loading businesses...</p>:suppliers.length?<div className="gura-live-business-grid">{suppliers.map(b=><article className="gura-live-business" key={b.id}>
+          {b.images?.[0]?<img src={b.images[0]} alt={b.name} loading="lazy"/>:<div className="gura-live-business-placeholder"><Store size={31}/></div>}
+          <div><span className={b.verified&&b.moderationStatus==="approved"?"gura-live-verified":"gura-live-unverified"}>{b.verified&&b.moderationStatus==="approved"?"Verified":"Not Yet Verified"}</span><h3>{b.name}</h3><p>{b.location} · {b.type==="technician"?"Technician":"Shop"}</p><Link to={"/directory?q="+encodeURIComponent(b.name)}>View business <ArrowRight size={15}/></Link></div>
+        </article>)}</div>:<p className="gura-live-loading">Business profiles will appear here when providers publish them.</p>}
       </section>
-      
-      <div className="container gura-tech-benefits"><div><ShieldCheck size={24}/><span><strong>Built around trust</strong><small>Verification and moderation tools for business profiles.</small></span></div><div><MessageCircle size={24}/><span><strong>Connect directly</strong><small>Start a service inquiry with a local provider.</small></span></div><div><MapPin size={24}/><span><strong>Made for local sourcing</strong><small>Discover services and shops by location.</small></span></div></div>
     </section>
   </main>;
 }

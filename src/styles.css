@@ -1173,3 +1173,53 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
   .app-shell:has(.gura-tech-home) .site-header .nav.open{background:#fff;border:1px solid #dce8ec;box-shadow:0 10px 24px rgba(20,60,72,.1)}
   .app-shell .gura-tech-hero:before{background-image:linear-gradient(90deg,rgba(250,252,253,.9),rgba(250,252,253,.7)),url("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2000&q=85")}
 }
+
+/* Homepage is rendered from live product and business data, not sample cards. */
+.app-shell .gura-live-home .gura-tech-search{grid-template-columns:minmax(0,1fr) 190px;max-width:760px}
+.app-shell .gura-live-hero-aside{background:rgba(255,255,255,.9);border:1px solid #d0e2e8;border-top:3px solid #e87632;box-shadow:0 16px 34px rgba(15,50,65,.12);border-radius:11px;padding:24px;min-width:0}
+.app-shell .gura-live-hero-aside h2{color:#17343e;font-size:clamp(20px,2.2vw,27px);margin:14px 0 8px;line-height:1.25}
+.app-shell .gura-live-hero-aside>strong{color:#b35420;font-size:24px}
+.app-shell .gura-live-hero-aside p{color:#58717b;font-size:13px;line-height:1.55}
+.app-shell .gura-live-hero-image{display:block;margin-top:12px}
+.app-shell .gura-live-hero-image img,.app-shell .gura-live-hero-image-static{width:100%;height:195px;object-fit:cover;border-radius:8px;background:#eef4f5;display:block}
+.app-shell .gura-live-item-link{display:inline-flex;align-items:center;gap:7px;color:#b55424;font-weight:800;font-size:13px;margin-top:8px}
+.app-shell .gura-live-counts{display:flex;flex-wrap:wrap;gap:15px 34px;padding:0 26px 27px;color:#456571;font-size:13px}
+.app-shell .gura-live-counts span{display:flex;align-items:center;gap:9px}
+.app-shell .gura-live-counts strong{font-size:24px;color:#c45a23}
+.app-shell .gura-live-product-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:17px}
+.app-shell .gura-live-product{display:flex;flex-direction:column;background:#fff;border:1px solid #dbe5e9;border-radius:11px;overflow:hidden;box-shadow:0 8px 24px rgba(25,55,68,.06);min-width:0}
+.app-shell .gura-live-product-photo{height:185px;display:block;background:#eef3f5}
+.app-shell .gura-live-product-photo img{width:100%;height:100%;display:block;object-fit:cover}
+.app-shell .gura-live-product-body{padding:16px;display:flex;align-items:flex-start;flex-direction:column;gap:9px;flex:1}
+.app-shell .gura-live-product-body>small{color:#66808a;font-size:11px}
+.app-shell .gura-live-product-body h3{font-size:16px;color:#17333e;line-height:1.35;margin:0}
+.app-shell .gura-live-product-body>strong{font-size:19px;color:#b7501f}
+.app-shell .gura-live-product-body>p{font-size:12px;line-height:1.45;color:#64808a;margin:0}
+.app-shell .gura-live-verified,.app-shell .gura-live-unverified{font-size:11px;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:30px;font-weight:800}
+.app-shell .gura-live-verified{color:#236b48;background:#eaf8ee}
+.app-shell .gura-live-unverified{color:#8a5d19;background:#fff4de}
+.app-shell .gura-live-view{margin-top:auto;color:#a94f20;font-size:13px;display:inline-flex;align-items:center;gap:6px;font-weight:800}
+.app-shell .gura-live-empty{border:1px dashed #c6d8df;background:#f8fbfc;border-radius:11px;text-align:center;padding:34px 20px;color:#456775}
+.app-shell .gura-live-empty h3{font-size:19px;color:#193a46;margin:12px 0 7px}
+.app-shell .gura-live-empty p{font-size:13px;line-height:1.55}
+.app-shell .gura-live-empty a{font-weight:800;color:#b45a27;display:inline-flex;align-items:center;gap:6px}
+.app-shell .gura-live-loading{color:#607d87;font-size:14px}
+.app-shell .gura-live-error{color:#9a3b2e;background:#fff1ed;border:1px solid #f4ccc1;padding:12px 16px;border-radius:8px}
+.app-shell .gura-live-category-section{padding-top:35px}
+.app-shell .gura-live-categories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.app-shell .gura-live-category{display:flex;align-items:center;gap:13px;padding:12px;border:1px solid #dce8ed;border-radius:9px;background:#f8fbfc;color:#22404b;min-width:0}
+.app-shell .gura-live-category img{height:65px;width:72px;object-fit:cover;border-radius:6px;flex:none}
+.app-shell .gura-live-category span{display:grid;gap:4px;flex:1;min-width:0}
+.app-shell .gura-live-category strong{font-size:13px;overflow-wrap:anywhere}
+.app-shell .gura-live-category small{color:#657d89;font-size:11px}
+.app-shell .gura-live-category>svg{flex:none;color:#bd5b24}
+.app-shell .gura-live-business-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.app-shell .gura-live-business{background:#fff;border:1px solid #dce7eb;border-radius:10px;overflow:hidden}
+.app-shell .gura-live-business>img,.app-shell .gura-live-business-placeholder{width:100%;height:145px;object-fit:cover;background:#eaf2f4;display:grid;place-items:center;color:#69919d}
+.app-shell .gura-live-business>div:last-child{display:grid;align-content:start;justify-items:start;gap:9px;padding:15px}
+.app-shell .gura-live-business h3{font-size:16px;color:#1d3a45;margin:0}
+.app-shell .gura-live-business p{font-size:12px;color:#5e7b87;margin:0}
+.app-shell .gura-live-business a{font-size:12px;color:#b65322;font-weight:800;display:flex;align-items:center;gap:6px}
+@media(max-width:1000px){.app-shell .gura-live-product-grid,.app-shell .gura-live-business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.app-shell .gura-live-home .gura-tech-search{grid-template-columns:1fr}.app-shell .gura-live-hero-aside{max-width:480px}.app-shell .gura-live-categories{grid-template-columns:repeat(2,minmax(0,1fr))}.app-shell .gura-live-counts{padding-inline:20px}}
+@media(max-width:510px){.app-shell .gura-live-product-grid,.app-shell .gura-live-business-grid,.app-shell .gura-live-categories{grid-template-columns:1fr}.app-shell .gura-live-product-photo{height:220px}.app-shell .gura-live-counts{gap:12px 18px}}
