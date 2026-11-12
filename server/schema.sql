@@ -179,3 +179,8 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS business_listing_id UUID REFERENCES listings(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS marketplace_products_owner_idx ON marketplace_products(owner_id, created_at DESC);
+
+-- Product galleries retain the first image_url for backwards compatibility.
+ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS image_urls TEXT[] NOT NULL DEFAULT '{}';
+UPDATE marketplace_products SET image_urls = ARRAY[image_url]
+ WHERE cardinality(image_urls) = 0 AND image_url <> '';

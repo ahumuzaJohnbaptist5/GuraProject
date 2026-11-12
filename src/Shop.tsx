@@ -6,7 +6,7 @@ import { prepareListingPhotos } from "./listingPhotos";
 
 export type ShopProduct = {
   id:string; sku:string; name:string; description:string; category:string; priceUgx:number; availableUnits:number;
-  imageUrl:string; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean; sellerVerified?:boolean; businessName?:string;
+  imageUrl:string; imageUrls?:string[]; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean; sellerVerified?:boolean; businessName?:string;
 };
 type ProviderListing={id:string;name:string;type:"shop"|"technician"|"seller";location:string;text:string;images?:string[];verified:boolean;moderationStatus:"pending"|"approved"|"rejected"};
 type CartEntry={productId:string;quantity:number};
@@ -72,11 +72,11 @@ export function ShopPage(){
   </main>;
 }
 export function ProductPage(){
-  const {id}=useParams();const navigate=useNavigate();const [product,setProduct]=useState<ShopProduct|null>(null);const [quantity,setQuantity]=useState(1);const [error,setError]=useState("");const [loading,setLoading]=useState(true);
+  const {id}=useParams();const navigate=useNavigate();const [product,setProduct]=useState<ShopProduct|null>(null);const [activePhoto,setActivePhoto]=useState(0);const [quantity,setQuantity]=useState(1);const [error,setError]=useState("");const [loading,setLoading]=useState(true);
   useEffect(()=>{if(!id)return;let active=true;request<{product:ShopProduct}>("/products/"+id).then(r=>{if(active)setProduct(r.product)}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[id]);
   const add=()=>{if(!product)return;try{addToCart(product,quantity);navigate("/cart")}catch(e){setError(e instanceof Error?e.message:"Cannot add to cart.")}};
   return <main className="container gura-shop-page"><Link className="gura-shop-back" to="/shop"><ArrowLeft size={16}/> All products</Link>{loading&&<p>Loading product information...</p>}{error&&<p className="gura-shop-error" role="alert">{error}</p>}
-    {product&&<div className="gura-product-layout"><div className="gura-product-hero-image"><img src={product.imageUrl} alt={product.name}/></div><div className="gura-product-information"><span className="gura-shop-category">{product.category} · {product.condition}</span><h1>{product.name}</h1><p>{product.description}</p><strong className="gura-product-price">{money(product.priceUgx)}</strong><p>{product.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified supplier</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p>{product.businessName&&<p>Seller: <b>{product.businessName}</b></p>}<p className="gura-product-stock">Available stock: <b>{product.availableUnits} units</b></p><p><b>Compatibility:</b> {product.compatibility}</p><h2>Full specifications</h2><dl className="gura-specs">{Object.entries(product.specifications).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}<div><dt>SKU</dt><dd>{product.sku}</dd></div><div><dt>Condition</dt><dd>{product.condition}</dd></div></dl><div className="gura-product-actions"><div className="gura-quantity"><button type="button" onClick={()=>setQuantity(q=>Math.max(1,q-1))} aria-label="Decrease quantity"><Minus size={16}/></button><span>{quantity}</span><button type="button" onClick={()=>setQuantity(q=>Math.min(Math.min(20,product.availableUnits),q+1))} aria-label="Increase quantity"><Plus size={16}/></button></div><button className="gura-shop-primary" onClick={add} disabled={product.availableUnits===0||!product.sellerVerified}><ShoppingCart size={18}/> Add to cart</button></div></div></div>}
+    {product&&<div className="gura-product-layout"><div className="gura-product-gallery"><div className="gura-product-hero-image"><img src={(product.imageUrls?.length?product.imageUrls:[product.imageUrl])[activePhoto]||product.imageUrl} alt={`${product.name} — photo ${activePhoto+1}`}/></div><div className="gura-product-thumbnails">{(product.imageUrls?.length?product.imageUrls:[product.imageUrl]).map((src,index)=><button type="button" className={activePhoto===index?"selected":""} key={index} onClick={()=>setActivePhoto(index)} aria-label={`View product photo ${index+1}`} aria-pressed={activePhoto===index}><img src={src} alt={`Thumbnail ${index+1}`}/></button>)}</div></div><div className="gura-product-information"><span className="gura-shop-category">{product.category} · {product.condition}</span><h1>{product.name}</h1><p>{product.description}</p><strong className="gura-product-price">{money(product.priceUgx)}</strong><p>{product.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified supplier</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p>{product.businessName&&<p>Seller: <b>{product.businessName}</b></p>}<p className="gura-product-stock">Available stock: <b>{product.availableUnits} units</b></p><p><b>Compatibility:</b> {product.compatibility}</p><h2>Full specifications</h2><dl className="gura-specs">{Object.entries(product.specifications).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}<div><dt>SKU</dt><dd>{product.sku}</dd></div><div><dt>Condition</dt><dd>{product.condition}</dd></div></dl><div className="gura-product-actions"><div className="gura-quantity"><button type="button" onClick={()=>setQuantity(q=>Math.max(1,q-1))} aria-label="Decrease quantity"><Minus size={16}/></button><span>{quantity}</span><button type="button" onClick={()=>setQuantity(q=>Math.min(Math.min(20,product.availableUnits),q+1))} aria-label="Increase quantity"><Plus size={16}/></button></div><button className="gura-shop-primary" onClick={add} disabled={product.availableUnits===0||!product.sellerVerified}><ShoppingCart size={18}/> Add to cart</button></div></div></div>}
   </main>;
 }
 export function CartPage(){
@@ -144,7 +144,7 @@ export function OrdersPage({user}:{user:User|null}){
 }
 
 type ManagedProduct=ShopProduct&{active:boolean};
-const emptyProduct=()=>({name:"",description:"",category:"",priceUgx:"",availableUnits:"",imageUrl:"",condition:"New",compatibility:"",active:true});
+const emptyProduct=()=>({name:"",description:"",category:"",priceUgx:"",availableUnits:"",imageUrls:[] as string[],condition:"New",compatibility:"",active:true});
 export function ProviderInventory({user,hasBusiness}:{user:User;hasBusiness:boolean}){
   const [items,setItems]=useState<ManagedProduct[]>([]);
   const [open,setOpen]=useState(false);
@@ -161,15 +161,15 @@ export function ProviderInventory({user,hasBusiness}:{user:User;hasBusiness:bool
   if(user.role!=="shop"&&user.role!=="technician")return null;
   const begin=(item?:ManagedProduct)=>{
     setEditing(item?.id||null);
-    setForm(item?{name:item.name,description:item.description,category:item.category,priceUgx:String(item.priceUgx),availableUnits:String(item.availableUnits),imageUrl:item.imageUrl,condition:item.condition,compatibility:item.compatibility,active:item.active}:emptyProduct());
+    setForm(item?{name:item.name,description:item.description,category:item.category,priceUgx:String(item.priceUgx),availableUnits:String(item.availableUnits),imageUrls:item.imageUrls?.length?item.imageUrls:[item.imageUrl],condition:item.condition,compatibility:item.compatibility,active:item.active}:emptyProduct());
     setError("");setNotice("");setOpen(true);
   };
   const save=async(event:React.FormEvent)=>{
     event.preventDefault();setBusy(true);setError("");setNotice("");
     try{
-      if(!form.imageUrl)throw new Error("Add a product photo first.");
+      if(!form.imageUrls.length)throw new Error("Add at least one product photo.");
       const payload={name:form.name.trim(),description:form.description.trim(),category:form.category.trim(),
-        priceUgx:Number(form.priceUgx),availableUnits:Number(form.availableUnits),imageUrl:form.imageUrl,
+        priceUgx:Number(form.priceUgx),availableUnits:Number(form.availableUnits),imageUrls:form.imageUrls,
         condition:form.condition,compatibility:form.compatibility,active:form.active};
       await request(editing?"/my-products/"+editing:"/my-products",{method:editing?"PATCH":"POST",body:JSON.stringify(payload)});
       await load();setOpen(false);setNotice(editing?"Product updated.":"Product added to your business.");
@@ -186,7 +186,7 @@ export function ProviderInventory({user,hasBusiness}:{user:User;hasBusiness:bool
     <div className="panel-title"><div><p className="eyebrow">Inventory & services</p><h2>Products and items</h2></div>
       {!open&&<button className="button small" disabled={!hasBusiness} onClick={()=>begin()}>Add product</button>}
       {open&&<button className="text-button" onClick={()=>{setOpen(false);setError("")}}>Cancel</button>}</div>
-    <p className="muted-text">Add and update as many items as needed within your one business. Each product has its own photograph, price and available units. Items from unverified businesses show Not Yet Verified publicly and cannot be paid for until approval.</p>
+    <p className="muted-text">Add and update as many items as needed within your one business. Each product supports up to three photos, a price and available units. Items from unverified businesses show Not Yet Verified publicly and cannot be paid for until approval.</p>
     {!hasBusiness&&<p className="gura-shop-warning">Create your business profile above before adding products.</p>}
     {notice&&<p className="success" role="status">{notice}</p>}{error&&<p className="error" role="alert">{error}</p>}
     {open&&<form onSubmit={save} className="listing-form gura-item-form">
@@ -197,8 +197,8 @@ export function ProviderInventory({user,hasBusiness}:{user:User;hasBusiness:bool
       <label>Available units<input required type="number" min="0" max="1000000" value={form.availableUnits} onChange={e=>setForm({...form,availableUnits:e.target.value})}/></label>
       <label>Condition<select value={form.condition} onChange={e=>setForm({...form,condition:e.target.value})}><option>New</option><option>Used</option><option>Refurbished</option></select></label>
       <label>Compatibility<input maxLength={300} placeholder="Supported device models" value={form.compatibility} onChange={e=>setForm({...form,compatibility:e.target.value})}/></label>
-      <label>Product photograph<input type="file" accept="image/jpeg,image/png,image/webp" onChange={async e=>{try{const images=await prepareListingPhotos(e.target.files,1);if(images[0])setForm(prev=>({...prev,imageUrl:images[0]}));setError("")}catch(cause){setError(cause instanceof Error?cause.message:"Photo could not be processed.")}e.target.value=""}}/></label>
-      {form.imageUrl&&<img className="gura-item-image-preview" src={form.imageUrl} alt="Product photo preview"/>}
+      <label>Product photographs ({form.imageUrls.length}/3)<input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy||form.imageUrls.length>=3} onChange={async e=>{try{const images=await prepareListingPhotos(e.target.files,3-form.imageUrls.length);setForm(prev=>({...prev,imageUrls:[...prev.imageUrls,...images]}));setError("")}catch(cause){setError(cause instanceof Error?cause.message:"Photos could not be processed.")}e.target.value=""}}/></label>
+      <div className="gura-item-photo-previews">{form.imageUrls.map((src,index)=><div className="gura-item-photo-preview" key={index}><img className="gura-item-image-preview" src={src} alt={`Product photo ${index+1}`}/><button type="button" aria-label={`Remove product photo ${index+1}`} onClick={()=>setForm(prev=>({...prev,imageUrls:prev.imageUrls.filter((_,i)=>i!==index)}))}>Remove</button>{index===0&&<small>Main photo</small>}</div>)}</div>
       <label className="gura-item-active"><input type="checkbox" checked={form.active} onChange={e=>setForm({...form,active:e.target.checked})}/> Listed in marketplace</label>
       <button className="button" disabled={busy}>{busy?"Saving...":editing?"Save product updates":"Publish product"}</button>
     </form>}
