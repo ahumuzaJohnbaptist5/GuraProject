@@ -103,20 +103,34 @@ commerceRouter.post("/my-products", protect, asyncRoute(async (req,res)=>{
   const data=managedItemSchema.omit({active:true}).parse(req.body);
   const business=await query<{id:string}>('SELECT id FROM listings WHERE owner_id=$1 ORDER BY created_at ASC LIMIT 1',[user.id]);
   if (!business.rows[0]){res.status(409).json({error:"Create your business profile before adding inventory."});return;}
-  const result=await query('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,image_urls,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,TRUE) RETURNING id',
-    [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrls[0],data.imageUrls,data.condition,data.compatibility]);
-  res.status(201).json({id:result.rows[0].id});
+  const productId=await withAuditTransaction(async client=>{
+    const result=await client.query<{id:string}>('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,image_urls,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,TRUE) RETURNING id',
+      [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrls[0],data.imageUrls,data.condition,data.compatibility]);
+    const id=result.rows[0].id;
+    await appendAudit(client,{actorId:user.id,action:"product.created",subjectType:"product",subjectId:id,
+      detail:{priceUgx:data.priceUgx,availableUnits:data.availableUnits}});
+    return id;
+  });
+  res.status(201).json({id:productId});
 }));
 commerceRouter.patch("/my-products/:id",protect,asyncRoute(async (req,res)=>{
   const user=res.locals.user as AuthUser;
   if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
   const id=z.string().uuid().parse(req.params.id);
   const data=managedItemSchema.partial().parse(req.body);
-  const result=await query(
-    "UPDATE marketplace_products SET name=COALESCE($1,name),description=COALESCE($2,description),category=COALESCE($3,category),price_ugx=COALESCE($4,price_ugx),available_units=COALESCE($5,available_units),image_url=COALESCE($6,image_url),image_urls=COALESCE($7,image_urls),condition=COALESCE($8,condition),compatibility=COALESCE($9,compatibility),active=COALESCE($10,active) WHERE id=$11 AND owner_id=$12 AND is_demo=FALSE RETURNING id",
-    [data.name??null,data.description??null,data.category??null,data.priceUgx??null,data.availableUnits??null,data.imageUrls?.[0]??null,data.imageUrls??null,data.condition??null,data.compatibility??null,data.active??null,id,user.id],
-  );
-  if(!result.rowCount){res.status(404).json({error:"Product not found in your business."});return;}
+  const updated=await withAuditTransaction(async client=>{
+    const result=await client.query(
+      "UPDATE marketplace_products SET name=COALESCE($1,name),description=COALESCE($2,description),category=COALESCE($3,category),price_ugx=COALESCE($4,price_ugx),available_units=COALESCE($5,available_units),image_url=COALESCE($6,image_url),image_urls=COALESCE($7,image_urls),condition=COALESCE($8,condition),compatibility=COALESCE($9,compatibility),active=COALESCE($10,active) WHERE id=$11 AND owner_id=$12 AND is_demo=FALSE RETURNING id",
+      [data.name??null,data.description??null,data.category??null,data.priceUgx??null,data.availableUnits??null,data.imageUrls?.[0]??null,data.imageUrls??null,data.condition??null,data.compatibility??null,data.active??null,id,user.id],
+    );
+    if(!result.rowCount)return false;
+    await appendAudit(client,{actorId:user.id,action:"product.updated",subjectType:"product",subjectId:id,
+      detail:{...(data.priceUgx!==undefined?{priceUgx:data.priceUgx}:{}),
+        ...(data.availableUnits!==undefined?{availableUnits:data.availableUnits}:{}),
+        ...(data.active!==undefined?{active:data.active}:{})}});
+    return true;
+  });
+  if(!updated){res.status(404).json({error:"Product not found in your business."});return;}
   res.json({id});
 }));
 commerceRouter.get("/orders", protect, asyncRoute(async (_req, res) => {
