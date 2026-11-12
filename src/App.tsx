@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download, Heart, Image as ImageIcon, LogOut, Menu, MessageCircle, RotateCcw, Search, ShieldCheck, Star, Store, Trash2, Upload, Wrench, X, MapPin, HardDrive, Cpu, Monitor, Plug, Eye, EyeOff, LockKeyhole, LoaderCircle } from "lucide-react";
 import auth, { refreshSession } from "./auth";
+import { prepareListingPhotos } from "./listingPhotos";
 import { CartHeaderLink, CartPage, CheckoutPage, OrdersPage, ProductPage, ShopPage } from "./Shop";
 import { confirmRequestDate, createAuditEvent, createListing, createMessage, createReport, createRequest, createReview, domainAdapter, exportDomainData, getListingRating, hydrateDomain, listAuditEvents, listFavorites, listListings, listMessages, listNotifications, listReports, listRequests, listReviews, markNotificationsRead, resetDomainData, toggleFavorite, updateListing, updateListingStatus, updateReportStatus, updateRequest } from "./data";
 import type { Listing, ListingType, Role, ServiceRequest, User } from "./types";
@@ -216,36 +217,70 @@ function NotificationPanel({ user }: { user: User }) {
 }
 
 function ListingManager({ user, listings, onChange }: { user: User; listings: Listing[]; onChange: () => void }) {
-  const [open, setOpen] = useState(false); const [editing, setEditing] = useState<string | null>(null); const [form, setForm] = useState({ name: "", location: "", availability: "", text: "", services: "" }); const type: ListingType = user.role === "shop" ? "shop" : "technician";
-  if (user.role !== "technician" && user.role !== "shop") return null;
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", location: "", availability: "", text: "", services: "" });
+  const [newPhotos, setNewPhotos] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const own = listings.filter(listing => listing.ownerId === user.id);
+  const business = own[0];
+  const type: ListingType = user.role === "shop" ? "shop" : "technician";
+  const startEdit = () => {
+    if (business) setForm({
+      name: business.name, location: business.location, availability: business.availability || "",
+      text: business.text, services: business.services.join(", "),
+    });
+    else setForm({ name:"",location:"",availability:"",text:"",services:"" });
+    setNewPhotos([]);
+    setError("");
+    setOpen(true);
+  };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError("");
-    setSaving(true);
+    setBusy(true); setError("");
     try {
-      await createListing({ id: crypto.randomUUID(), ownerId: user.id, name: form.name, type, location: form.location, availability: form.availability, text: form.text, services: form.services.split(",").map((item) => item.trim()).filter(Boolean), verified: false, rating: 0, moderationStatus: "pending" });
-      setForm({ name: "", location: "", availability: "", text: "", services: "" });
+      const values = {
+        name:form.name.trim(), location:form.location.trim(), availability:form.availability.trim(),
+        text:form.text.trim(), services:form.services.split(",").map(x=>x.trim()).filter(Boolean),
+      };
+      if (business) {
+        await updateListing(business.id, { ...values, images:[...(business.images || []),...newPhotos] });
+      } else {
+        await createListing({
+          id:crypto.randomUUID(),ownerId:user.id,type,...values,images:newPhotos,verified:false,rating:0,moderationStatus:"pending",
+        });
+      }
+      setNewPhotos([]);
       setOpen(false);
       onChange();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save listing.");
-    } finally {
-      setSaving(false);
-    }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save your business."); }
+    finally { setBusy(false); }
   };
-  const own = listings.filter((listing) => listing.ownerId === user.id);
-  const saveAvailability = async (listing: Listing, availability: string) => {
-    try {
-      await updateListing(listing.id, { availability });
-      setEditing(null);
-      onChange();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to update hours.");
-    }
-  };
-  return <section className="panel listing-manager"><div className="panel-title"><div><p className="eyebrow">Your storefront</p><h2>Listings</h2></div><button className="button small" onClick={() => setOpen(!open)}>{open ? "Close" : "Add listing"}</button></div>{open && <form className="listing-form" onSubmit={submit}><label>Listing name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Northside Device Lab" /></label><label>Location<input required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. East district" /></label><label>Availability<input value={form.availability} onChange={(e) => setForm({ ...form, availability: e.target.value })} placeholder="Weekdays · 09:00–17:00" /></label><label>What do you offer?<textarea required rows={3} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} /></label><label>Services <small>comma separated</small><input required value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} placeholder="Screen repair, Diagnostics" /></label><button className="button" disabled={saving}>{saving ? "Saving..." : "Submit for review"}</button></form>}{error && <p className="error" role="alert">{error}</p>}{own.length ? own.map((listing) => <div className="listing-owner-card" key={listing.id}><div className="admin-row"><span><b>{listing.name}</b><small>{listing.location} · {listing.moderationStatus || "approved"}</small>{editing === listing.id ? <input className="availability-edit" aria-label={`Availability for ${listing.name}`} defaultValue={listing.availability || ""} onKeyDown={(event) => { if (event.key === "Enter") saveAvailability(listing, event.currentTarget.value); }} onBlur={(event) => saveAvailability(listing, event.currentTarget.value)} /> : <small>{listing.availability || "Availability not set"}</small>}</span><span className="listing-row-actions"><span className="tag">{listing.moderationStatus || "approved"}</span><button className="text-button" onClick={() => setEditing(listing.id)}>Edit hours</button></span></div><ListingMediaRoom listing={listing} onChange={onChange} /></div>) : <p className="muted-text">Create a listing to appear in the directory as Not Yet Verified until an administrator approves it.</p>}</section>;
+  if (user.role !== "technician" && user.role !== "shop") return null;
+  return <section className="panel listing-manager">
+    <div className="panel-title"><div><p className="eyebrow">Your business account</p><h2>{business ? "Manage your business" : "Create your business"}</h2></div>
+      {!open && <button className="button small" onClick={startEdit}>{business ? "Edit business" : "Create business"}</button>}
+      {open && <button className="text-button" onClick={() => {setOpen(false);setNewPhotos([]);}}>Cancel</button>}
+    </div>
+    <p className="muted-text">Each shop or technician account owns one business profile. Keep your services, product gallery and business details updated here.</p>
+    {own.length > 1 && <p className="gura-shop-warning">This account has older duplicate business records. Your first business is editable; contact the administrator to consolidate the others safely.</p>}
+    {open && <form className="listing-form" onSubmit={submit}>
+      <label>Business name<input required maxLength={160} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+      <label>Location<input required maxLength={160} value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/></label>
+      <label>Availability<input maxLength={160} value={form.availability} onChange={e=>setForm({...form,availability:e.target.value})}/></label>
+      <label>Business description<textarea required rows={3} maxLength={4000} value={form.text} onChange={e=>setForm({...form,text:e.target.value})}/></label>
+      <label>{user.role==="shop"?"Products & services offered":"Repair services"} <small>(comma-separated)</small><input required value={form.services} onChange={e=>setForm({...form,services:e.target.value})} placeholder="Laptop screens, RAM, SSDs, Repairs"/></label>
+      <label>Upload marketplace photographs (up to 6 total)<input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || newPhotos.length+(business?.images?.length||0)>=6} onChange={async e=>{try{const photos=await prepareListingPhotos(e.target.files,6-newPhotos.length-(business?.images?.length||0));setNewPhotos(previous=>[...previous,...photos]);setError("");}catch(cause){setError(cause instanceof Error?cause.message:"Unable to prepare photos.");}e.target.value="";}} /></label>
+      {!!newPhotos.length && <div className="media-grid">{newPhotos.map((photo,index)=><div className="media-item" key={index}><img src={photo} alt={`Selected business photo ${index+1}`}/><button type="button" aria-label={`Remove selected photo ${index+1}`} onClick={()=>setNewPhotos(photos=>photos.filter((_,i)=>i!==index))}><Trash2 size={14}/></button></div>)}</div>}
+      {error && <p className="error" role="alert">{error}</p>}
+      <button className="button" disabled={busy}>{busy?"Saving...":business?"Save business updates":"Create business"}</button>
+    </form>}
+    {own.map(listing=><div key={listing.id} className="listing-owner-card">
+      <div className="admin-row"><span><b>{listing.name}</b><small>{listing.location} · {listing.verified && listing.moderationStatus==="approved"?"Verified":"Not Yet Verified"}</small></span><span className="tag">{listing.moderationStatus||"pending"}</span></div>
+      <ListingMediaRoom listing={listing} onChange={onChange}/>
+    </div>)}
+    {!business && !open && <p className="muted-text">Create your business once and add images immediately. Your profile appears on the marketplace as Not Yet Verified until approval.</p>}
+  </section>;
 }
 
 function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: () => void }) {
