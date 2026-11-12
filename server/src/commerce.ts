@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { currentUser, type AuthUser } from "./auth.js";
@@ -16,7 +17,7 @@ const protect = async (req: Request, res: Response, next: NextFunction) => {
     next();
   } catch (error) { next(error); }
 };
-const productFields = 'id, sku, name, description, category, price_ugx AS "priceUgx", available_units AS "availableUnits", image_url AS "imageUrl", condition, compatibility, specifications, is_demo AS "isDemo"';
+const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
 const pesapalBase = process.env.PESAPAL_ENV === "live" ? "https://pay.pesapal.com/v3/api" : "https://cybqa.pesapal.com/pesapalv3/api";
 const pesapalEnabled = Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET && process.env.PESAPAL_IPN_ID);
 const moneyRequest = async (path: string, init?: RequestInit) => {
@@ -34,14 +35,54 @@ const pesapalToken = async () => {
   return result.token;
 };
 commerceRouter.get("/products", asyncRoute(async (_req, res) => {
-  const products = await query('SELECT ' + productFields + ' FROM marketplace_products WHERE active = TRUE AND is_demo = FALSE ORDER BY created_at ASC');
+  const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
   res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
 }));
 commerceRouter.get("/products/:id", asyncRoute(async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
-  const result = await query('SELECT ' + productFields + ' FROM marketplace_products WHERE id = $1 AND active = TRUE AND is_demo = FALSE', [id]);
+  const result = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.id = $1 AND p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\')', [id]);
   if (!result.rows.length) { res.status(404).json({ error: "Product not found." }); return; }
   res.json({ product: result.rows[0] });
+}));
+
+const managedItemSchema = z.object({
+  name:z.string().trim().min(3).max(160),
+  description:z.string().trim().min(5).max(2000),
+  category:z.string().trim().min(2).max(100),
+  priceUgx:z.number().int().min(100).max(1_000_000_000),
+  availableUnits:z.number().int().min(0).max(1_000_000),
+  imageUrl:z.string().trim().max(350_000).refine(v => /^data:image\/(?:jpeg|png|webp);base64,/.test(v) || /^https:\/\//.test(v), "Provide a compressed image."),
+  condition:z.enum(["New","Used","Refurbished"]),
+  compatibility:z.string().trim().max(300).default(""),
+  active:z.boolean().optional(),
+});
+commerceRouter.get("/my-products", protect, asyncRoute(async (_req,res)=>{
+  const user=res.locals.user as AuthUser;
+  if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
+  const result=await query('SELECT id, sku, name, description, category, price_ugx AS "priceUgx", available_units AS "availableUnits", image_url AS "imageUrl", condition, compatibility, active FROM marketplace_products WHERE owner_id = $1 AND is_demo = FALSE ORDER BY created_at DESC',[user.id]);
+  res.json({products:result.rows});
+}));
+commerceRouter.post("/my-products", protect, asyncRoute(async (req,res)=>{
+  const user=res.locals.user as AuthUser;
+  if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
+  const data=managedItemSchema.omit({active:true}).parse(req.body);
+  const business=await query<{id:string}>('SELECT id FROM listings WHERE owner_id=$1 ORDER BY created_at ASC LIMIT 1',[user.id]);
+  if (!business.rows[0]){res.status(409).json({error:"Create your business profile before adding inventory."});return;}
+  const result=await query('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,FALSE,TRUE) RETURNING id',
+    [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrl,data.condition,data.compatibility]);
+  res.status(201).json({id:result.rows[0].id});
+}));
+commerceRouter.patch("/my-products/:id",protect,asyncRoute(async (req,res)=>{
+  const user=res.locals.user as AuthUser;
+  if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
+  const id=z.string().uuid().parse(req.params.id);
+  const data=managedItemSchema.partial().parse(req.body);
+  const result=await query(
+    "UPDATE marketplace_products SET name=COALESCE($1,name),description=COALESCE($2,description),category=COALESCE($3,category),price_ugx=COALESCE($4,price_ugx),available_units=COALESCE($5,available_units),image_url=COALESCE($6,image_url),condition=COALESCE($7,condition),compatibility=COALESCE($8,compatibility),active=COALESCE($9,active) WHERE id=$10 AND owner_id=$11 AND is_demo=FALSE RETURNING id",
+    [data.name??null,data.description??null,data.category??null,data.priceUgx??null,data.availableUnits??null,data.imageUrl??null,data.condition??null,data.compatibility??null,data.active??null,id,user.id],
+  );
+  if(!result.rowCount){res.status(404).json({error:"Product not found in your business."});return;}
+  res.json({id});
 }));
 commerceRouter.get("/orders", protect, asyncRoute(async (_req, res) => {
   const user = res.locals.user as AuthUser;
@@ -76,7 +117,7 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
     await client.query("BEGIN");
     const ids = [...combined.keys()];
     const found = await client.query<{id: string;name: string;price_ugx:number;available_units:number;is_demo:boolean}>(
-      "SELECT id,name,price_ugx,available_units,is_demo FROM marketplace_products WHERE id=ANY($1::uuid[]) AND active=TRUE FOR SHARE", [ids],
+      "SELECT p.id,p.name,p.price_ugx,p.available_units,p.is_demo FROM marketplace_products p JOIN listings l ON p.business_listing_id=l.id WHERE p.id=ANY($1::uuid[]) AND p.active=TRUE AND l.moderation_status='approved' AND l.verified=TRUE FOR SHARE OF p", [ids],
     );
     if (found.rows.length !== ids.length) { res.status(400).json({ error: "Some products are no longer available." }); await client.query("ROLLBACK"); return; }
     for (const product of found.rows) {
