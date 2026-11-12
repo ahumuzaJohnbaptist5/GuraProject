@@ -35,12 +35,12 @@ const pesapalToken = async () => {
   return result.token;
 };
 commerceRouter.get("/products", asyncRoute(async (_req, res) => {
-  const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN ('pending','approved') ORDER BY p.created_at DESC');
+  const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
   res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
 }));
 commerceRouter.get("/products/:id", asyncRoute(async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
-  const result = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.id = $1 AND p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN ('pending','approved')', [id]);
+  const result = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.id = $1 AND p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\')', [id]);
   if (!result.rows.length) { res.status(404).json({ error: "Product not found." }); return; }
   res.json({ product: result.rows[0] });
 }));
