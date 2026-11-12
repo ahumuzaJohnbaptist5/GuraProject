@@ -184,3 +184,8 @@ CREATE INDEX IF NOT EXISTS marketplace_products_owner_idx ON marketplace_product
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS image_urls TEXT[] NOT NULL DEFAULT '{}';
 UPDATE marketplace_products SET image_urls = ARRAY[image_url]
  WHERE cardinality(image_urls) = 0 AND image_url <> '';
+
+-- Public business contacts: only explicitly supplied provider contact fields are shown.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS business_phone TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS business_whatsapp TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS business_email TEXT;
