@@ -13,7 +13,7 @@ const listingLabels: Record<ListingType, string> = { technician: "Technician", s
 function Header({ user, onLogout }: { user: User | null; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const unread = user ? listNotifications(user.id).filter((item) => !item.read).length : 0;
-  return <header className="site-header"><Link className="brand" to="/" aria-label="Gura home"><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></Link><CartHeaderLink/><button className="menu-button" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button><nav className={open ? "nav open" : "nav"}><Link to="/shop" onClick={() => setOpen(false)}>Products</Link><Link to="/directory" onClick={() => setOpen(false)}>Marketplace</Link><Link to="/#urgent-requests" onClick={() => setOpen(false)}>Urgent Requests</Link><Link to="/directory?type=shop" onClick={() => setOpen(false)}>Suppliers</Link>{user ? <><Link to="/orders" onClick={() => setOpen(false)}>My Orders</Link><Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard{unread > 0 && <span className="notification-badge">{unread}</span>}</Link><Link to="/profile" onClick={() => setOpen(false)}>My Profile</Link><button className="nav-logout" onClick={onLogout}><LogOut size={16} /> Sign out</button></> : <><Link to="/login" onClick={() => setOpen(false)}>Sign in</Link><Link className="button small" to="/register" onClick={() => setOpen(false)}>Get started</Link></>}</nav></header>;
+  return <header className="site-header"><Link className="brand" to="/" aria-label="Gura home"><img src="/gura-logo.png" alt="Gura Computer Parts Marketplace" /></Link><CartHeaderLink/><button className="menu-button" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}</button><nav className={open ? "nav open" : "nav"}><Link to="/shop" onClick={() => setOpen(false)}>Products</Link><Link to="/directory" onClick={() => setOpen(false)}>Marketplace</Link><Link to="/directory?type=shop" onClick={() => setOpen(false)}>Suppliers</Link>{user ? <><Link to="/orders" onClick={() => setOpen(false)}>My Orders</Link><Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard{unread > 0 && <span className="notification-badge">{unread}</span>}</Link><Link to="/profile" onClick={() => setOpen(false)}>My Profile</Link><button className="nav-logout" onClick={onLogout}><LogOut size={16} /> Sign out</button></> : <><Link to="/login" onClick={() => setOpen(false)}>Sign in</Link><Link className="button small" to="/register" onClick={() => setOpen(false)}>Get started</Link></>}</nav></header>;
 }
 function Layout({ children, user, onLogout }: { children: React.ReactNode; user: User | null; onLogout: () => void }) {
   return <div className="app-shell">
@@ -26,7 +26,7 @@ function Layout({ children, user, onLogout }: { children: React.ReactNode; user:
           <Link to="/">Home</Link>
           <Link to="/shop">Shop Products</Link><Link to="/directory">Marketplace</Link>
           <Link to="/directory?type=shop">Suppliers</Link>
-          <a href="/#urgent-requests">Urgent Requests</a>
+          
         </nav>
         <nav className="gura-footer-links" aria-label="Footer account links">
           <h2>Your Account</h2>
@@ -102,7 +102,7 @@ function FreshHome() {
         <p>Browse business listings with genuine provider-uploaded photos. Each listing clearly displays its current verification status.</p>
         <div className="gura-tech-discovery-actions"><Link to="/shop">Explore marketplace <ArrowRight size={17}/></Link><Link to="/directory?type=shop">Find shops and suppliers <ArrowRight size={17}/></Link></div>
       </section>
-      <div className="container gura-tech-request" id="urgent-requests"><div><span className="gura-tech-overline">CAN'T FIND IT?</span><h2>Missing a part? Find someone who can help.</h2><p>Browse nearby suppliers or describe your need in a service request to a listed provider.</p></div><Link to="/directory">Find a supplier <ArrowRight size={18}/></Link></div>
+      
       <div className="container gura-tech-benefits"><div><ShieldCheck size={24}/><span><strong>Built around trust</strong><small>Verification and moderation tools for business profiles.</small></span></div><div><MessageCircle size={24}/><span><strong>Connect directly</strong><small>Start a service inquiry with a local provider.</small></span></div><div><MapPin size={24}/><span><strong>Made for local sourcing</strong><small>Discover services and shops by location.</small></span></div></div>
     </section>
   </main>;
@@ -172,7 +172,7 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
         <div className="auth-welcome-copy">
           <p className="auth-kicker">Secure Regional Marketplace for Computer Parts</p>
           <h1>SECURE REGIONAL<br/>MARKETPLACE<br/><span>FOR COMPUTER<br/>PARTS</span></h1>
-          <ul className="gura-auth-benefits"><li><CheckCircle2 size={22}/>Discovery &amp; Sourcing</li><li><CheckCircle2 size={22}/>Urgent Requests</li><li><CheckCircle2 size={22}/>Secure Transactions <small>(planned)</small></li></ul>
+          <ul className="gura-auth-benefits"><li><CheckCircle2 size={22}/>Discovery &amp; Sourcing</li><li><CheckCircle2 size={22}/>Browse trusted suppliers</li><li><CheckCircle2 size={22}/>Secure Transactions <small>(planned)</small></li></ul>
         </div>
         <div className="gura-auth-trust"><ShieldCheck size={18}/><span>Connecting technicians, shops and suppliers</span></div>
       </section>
