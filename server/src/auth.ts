@@ -38,6 +38,9 @@ export type AuthUser = {
   location: string | null;
   bio: string | null;
   locationImages: string[];
+  businessPhone?: string | null;
+  businessWhatsapp?: string | null;
+  businessEmail?: string | null;
   verified: boolean;
   suspended: boolean;
 };
@@ -46,7 +49,7 @@ export const currentUser = async (request: Request): Promise<AuthUser | null> =>
   const token = request.cookies?.[SESSION_COOKIE];
   if (!token) return null;
   const result = await query<AuthUser>(
-    `SELECT u.id, u.name, u.email, u.role, u.location, u.bio, u.location_images AS "locationImages", u.verified, u.suspended
+    `SELECT u.id, u.name, u.email, u.role, u.location, u.bio, u.location_images AS "locationImages", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", u.verified, u.suspended
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [hashToken(token)],
