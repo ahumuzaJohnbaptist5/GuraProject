@@ -480,9 +480,13 @@ app.get("/api/admin/audit", requireUser, asyncRoute(async (_request, response) =
     response.status(403).json({ error: "Administrator access required." });
     return;
   }
+  // The administrator dashboard now displays server-authored ledger entries,
+  // not client-provided legacy activity notes.
   const result = await query(
-    `SELECT id, actor_id AS "actorId", action, target, details, created_at AS "createdAt"
-     FROM audit_events ORDER BY created_at DESC LIMIT 200`,
+    `SELECT id::text AS id, COALESCE(actor_id::text,'system') AS "actorId",
+       action, subject_type || ':' || subject_id AS target,
+       details::text AS details, occurred_at AS "createdAt"
+     FROM secure_audit_ledger ORDER BY id DESC LIMIT 200`,
   );
   response.json({ events: result.rows });
 }));
