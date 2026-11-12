@@ -1223,3 +1223,7 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 @media(max-width:1000px){.app-shell .gura-live-product-grid,.app-shell .gura-live-business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.app-shell .gura-live-home .gura-tech-search{grid-template-columns:1fr}.app-shell .gura-live-hero-aside{max-width:480px}.app-shell .gura-live-categories{grid-template-columns:repeat(2,minmax(0,1fr))}.app-shell .gura-live-counts{padding-inline:20px}}
 @media(max-width:510px){.app-shell .gura-live-product-grid,.app-shell .gura-live-business-grid,.app-shell .gura-live-categories{grid-template-columns:1fr}.app-shell .gura-live-product-photo{height:220px}.app-shell .gura-live-counts{gap:12px 18px}}
+
+/* Confirm that admin verification changes were persisted by the backend. */
+.app-shell .gura-admin-success { margin:10px 0; padding:10px 13px; border:1px solid #b9dfc7; border-radius:7px; background:#effaf3; color:#19643d; font-size:13px; font-weight:650; }
+.app-shell .admin-row .request-actions button:disabled { opacity:.55; cursor:wait; }
