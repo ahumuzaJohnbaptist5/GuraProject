@@ -291,27 +291,18 @@ function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: (
   const label = listing.type === "shop" ? "Marketplace product photos" : "Marketplace service photos";
   const help = listing.type === "shop" ? "Show products and stock. Add shop-front photos under My Profile instead." : "Show completed repair work and services. Add premises photos under My Profile instead.";
   const addImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/") && file.size <= 1_000_000).slice(0, 6 - images.length);
-    if (!files.length) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
+    setBusy(true); setError(""); setNotice("");
     try {
-      const encoded = await Promise.all(files.map((file) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("Unable to read image."));
-        reader.readAsDataURL(file);
-      })));
-      const saved = await updateListing(listing.id, { images: [...images, ...encoded] });
-      setNotice(saved.moderationStatus === "approved" ? "Images saved and available in the marketplace." : "Images saved and visible in the marketplace with a Not Yet Verified badge until administrator approval.");
+      const photos = await prepareListingPhotos(event.target.files, 6 - images.length);
+      if (!photos.length) return;
+      const saved = await updateListing(listing.id, { images: [...images, ...photos] });
+      setNotice(saved.verified && saved.moderationStatus === "approved"
+        ? "Photos saved and visible on your marketplace business."
+        : "Photos saved and visible on your marketplace business with a Not Yet Verified badge.");
       onChange();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to upload images. Please try again.");
-    } finally {
-      setBusy(false);
-      event.target.value = "";
-    }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to upload photos.");
+    } finally { setBusy(false); event.target.value = ""; }
   };
   const removeImage = async (image: string) => {
     setError("");
@@ -326,7 +317,7 @@ function ListingMediaRoom({ listing, onChange }: { listing: Listing; onChange: (
       setBusy(false);
     }
   };
-  return <div className="media-room"><div className="media-room-heading"><span><strong><ImageIcon size={17} /> {label}</strong><small>{help} Up to 6 images, 1 MB each.</small></span><label className="upload-button"><Upload size={15} /> {busy ? "Reading..." : "Add images"}<input type="file" accept="image/*" multiple disabled={busy || images.length >= 6} onChange={addImages} /></label></div>{images.length ? <div className="media-grid">{images.map((image, index) => <div className="media-item" key={image}><img src={image} alt={`${listing.name} image ${index + 1}`} /><button type="button" aria-label={`Remove image ${index + 1}`} onClick={() => removeImage(image)}><Trash2 size={14} /></button></div>)}</div> : <p className="muted-text">No images uploaded yet. Images help customers and administrators verify the listing.</p>}{error && <p className="error" role="alert">{error}</p>}{notice && <p className="success" role="status">{notice}</p>}{listing.moderationStatus !== "approved" && <p className="muted-text">This listing is {listing.moderationStatus || "pending"}. {listing.moderationStatus === "rejected" ? "Rejected listings are hidden from public search." : "It is visible publicly with a Not Yet Verified badge until an administrator approves it."}</p>}<small className="media-note">MVP storage: images are kept with the listing record. Move them to Supabase Storage before storing large production galleries.</small></div>;
+  return <div className="media-room"><div className="media-room-heading"><span><strong><ImageIcon size={17} /> {label}</strong><small>{help} Up to 6 images; JPG, PNG or WebP originals up to 8 MB each are automatically resized.</small></span><label className="upload-button"><Upload size={15} /> {busy ? "Reading..." : "Add images"}<input type="file" accept="image/*" multiple disabled={busy || images.length >= 6} onChange={addImages} /></label></div>{images.length ? <div className="media-grid">{images.map((image, index) => <div className="media-item" key={image}><img src={image} alt={`${listing.name} image ${index + 1}`} /><button type="button" aria-label={`Remove image ${index + 1}`} onClick={() => removeImage(image)}><Trash2 size={14} /></button></div>)}</div> : <p className="muted-text">No images uploaded yet. Images help customers and administrators verify the listing.</p>}{error && <p className="error" role="alert">{error}</p>}{notice && <p className="success" role="status">{notice}</p>}{listing.moderationStatus !== "approved" && <p className="muted-text">This listing is {listing.moderationStatus || "pending"}. {listing.moderationStatus === "rejected" ? "Rejected listings are hidden from public search." : "It is visible publicly with a Not Yet Verified badge until an administrator approves it."}</p>}<small className="media-note">MVP storage: images are kept with the listing record. Move them to Supabase Storage before storing large production galleries.</small></div>;
 }
 
 function FavoritesPanel({ user, listings }: { user: User; listings: Listing[] }) {
