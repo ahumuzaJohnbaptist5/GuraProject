@@ -1,4 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
+import { createHash } from "node:crypto";
 import { config } from "./config.js";
 
 type Bucket = {
@@ -26,8 +27,13 @@ export const rateLimit = (windowMs: number, max: number, message: string, option
       : "";
     // Authentication attempts are counted per account, not per shared
     // Render proxy IP. Unknown/invalid identifiers still fall back to IP.
+    // Reverse proxies make many legitimate visitors appear to share one IP.
+    // Use a signed-in session as the identity for non-authenticated write limits;
+    // only fall back to IP for anonymous traffic. Never store session secrets.
+    const session = typeof request.cookies?.gura_session === "string" ? request.cookies.gura_session : "";
+    const sessionKey = session ? "session:" + createHash("sha256").update(session).digest("hex") : "";
     const identity = submittedEmail && submittedEmail.length <= 320
-      ? "email:" + submittedEmail : "ip:" + clientKey(request);
+      ? "email:" + submittedEmail : sessionKey || "ip:" + clientKey(request);
     const key = `${message}:${identity}`;
     const bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
@@ -38,6 +44,7 @@ export const rateLimit = (windowMs: number, max: number, message: string, option
     bucket.count += 1;
     if (bucket.count > max) {
       response.setHeader("Retry-After", Math.ceil((bucket.resetAt - now) / 1000));
+      response.setHeader("X-Gura-Rate-Limit", options.keyByEmail ? "authentication" : "write");
       response.status(429).json({ error: message });
       return;
     }

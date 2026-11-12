@@ -13,10 +13,12 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(cors({ origin: config.webOrigin, credentials: true }));
 app.use(securityHeaders);
-app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly.", { skipReadOnly: true }));
 app.use(sameOrigin);
 app.use(express.json({ limit: "8mb" }));
 app.use(cookieParser());
+// Parse cookies and JSON before rate limiting so authenticated users do not
+// share a single quota behind the web proxy and login limits use email keys.
+app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly.", { skipReadOnly: true }));
 app.use("/api/commerce", commerceRouter);
 
 const asyncRoute = (handler: (request: Request, response: Response) => Promise<void>) =>
