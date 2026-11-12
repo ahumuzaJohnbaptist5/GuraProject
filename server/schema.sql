@@ -189,3 +189,28 @@ UPDATE marketplace_products SET image_urls = ARRAY[image_url]
 ALTER TABLE users ADD COLUMN IF NOT EXISTS business_phone TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS business_whatsapp TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS business_email TEXT;
+
+-- Centralized evidence ledger. Application appends only through transactional code.
+-- Reject UPDATE/DELETE by the application, including accidental ORM writes.
+CREATE TABLE IF NOT EXISTS secure_audit_ledger (
+  id BIGSERIAL PRIMARY KEY,
+  actor_id UUID,
+  action TEXT NOT NULL,
+  subject_type TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  previous_hash CHAR(64) NOT NULL,
+  entry_hash CHAR(64) NOT NULL UNIQUE,
+  signature CHAR(64),
+  high_value BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS secure_audit_subject_idx ON secure_audit_ledger(subject_type,subject_id,id DESC);
+CREATE OR REPLACE FUNCTION protect_secure_audit_ledger() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Audit ledger is append-only';
+END;
+$$;
+DROP TRIGGER IF EXISTS secure_audit_no_mutation ON secure_audit_ledger;
+CREATE TRIGGER secure_audit_no_mutation BEFORE UPDATE OR DELETE OR TRUNCATE
+ON secure_audit_ledger FOR EACH STATEMENT EXECUTE FUNCTION protect_secure_audit_ledger();
