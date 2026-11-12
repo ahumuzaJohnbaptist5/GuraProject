@@ -151,7 +151,7 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
     await client.query("BEGIN");
     const ids = [...combined.keys()];
     const found = await client.query<{id: string;name: string;price_ugx:number;available_units:number;is_demo:boolean}>(
-      "SELECT p.id,p.name,p.price_ugx,p.available_units,p.is_demo FROM marketplace_products p JOIN listings l ON p.business_listing_id=l.id WHERE p.id=ANY($1::uuid[]) AND p.active=TRUE AND l.moderation_status='approved' AND l.verified=TRUE FOR SHARE OF p", [ids],
+      "SELECT p.id,p.name,p.price_ugx,p.available_units,p.is_demo FROM marketplace_products p JOIN listings l ON p.business_listing_id=l.id WHERE p.id=ANY($1::uuid[]) AND p.active=TRUE AND l.moderation_status IN ('pending','approved') FOR SHARE OF p", [ids],
     );
     if (found.rows.length !== ids.length) { res.status(400).json({ error: "Some products are no longer available." }); await client.query("ROLLBACK"); return; }
     for (const product of found.rows) {
