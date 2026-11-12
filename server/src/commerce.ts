@@ -38,6 +38,40 @@ commerceRouter.get("/products", asyncRoute(async (_req, res) => {
   const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
   res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
 }));
+// Server-side catalogue search; /products remains unchanged for older clients.
+const catalogFilters = z.object({
+  q: z.string().trim().max(120).default(""),
+  category: z.string().trim().max(100).default(""),
+  condition: z.enum(["New", "Used", "Refurbished"]).optional(),
+  minPrice: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
+  maxPrice: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+  limit: z.coerce.number().int().min(1).max(48).default(24),
+}).refine(x => x.minPrice === undefined || x.maxPrice === undefined || x.minPrice <= x.maxPrice, { message: "Minimum price cannot exceed maximum price." });
+commerceRouter.get("/catalog", asyncRoute(async (req, res) => {
+  const filters = catalogFilters.parse(req.query);
+  const conditions = ["p.active=TRUE", "p.is_demo=FALSE", "l.moderation_status IN ('pending','approved')"];
+  const values: unknown[] = [];
+  const filter = (expression: string, value: unknown) => {
+    values.push(value);
+    conditions.push(expression.replace("?", "$" + values.length));
+  };
+  if (filters.q) {
+    values.push("%" + filters.q + "%");
+    const n = values.length;
+    conditions.push("(p.name ILIKE $" + n + " OR p.description ILIKE $" + n + " OR p.compatibility ILIKE $" + n + ")");
+  }
+  if (filters.category) filter("p.category=?", filters.category);
+  if (filters.condition) filter("p.condition=?", filters.condition);
+  if (filters.minPrice !== undefined) filter("p.price_ugx>=?", filters.minPrice);
+  if (filters.maxPrice !== undefined) filter("p.price_ugx<=?", filters.maxPrice);
+  const from = " FROM marketplace_products p JOIN listings l ON p.business_listing_id=l.id WHERE " + conditions.join(" AND ");
+  const count = await query<{total:string}>("SELECT COUNT(*)::text AS total" + from, values);
+  const total = Number(count.rows[0]?.total || 0);
+  const products = await query("SELECT " + productFields + from + " ORDER BY p.created_at DESC, p.id DESC LIMIT $" + (values.length + 1) + " OFFSET $" + (values.length + 2), [...values, filters.limit, (filters.page - 1) * filters.limit]);
+  res.json({products: products.rows, pagination: {page: filters.page, limit: filters.limit, total, pages: Math.ceil(total / filters.limit)}});
+}));
+
 commerceRouter.get("/products/:id", asyncRoute(async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
   const result = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id WHERE p.id = $1 AND p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\')', [id]);
