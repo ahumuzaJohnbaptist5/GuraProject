@@ -34,12 +34,12 @@ const pesapalToken = async () => {
   return result.token;
 };
 commerceRouter.get("/products", asyncRoute(async (_req, res) => {
-  const products = await query('SELECT ' + productFields + ' FROM marketplace_products WHERE active = TRUE ORDER BY created_at ASC');
+  const products = await query('SELECT ' + productFields + ' FROM marketplace_products WHERE active = TRUE AND is_demo = FALSE ORDER BY created_at ASC');
   res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
 }));
 commerceRouter.get("/products/:id", asyncRoute(async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
-  const result = await query('SELECT ' + productFields + ' FROM marketplace_products WHERE id = $1 AND active = TRUE', [id]);
+  const result = await query('SELECT ' + productFields + ' FROM marketplace_products WHERE id = $1 AND active = TRUE AND is_demo = FALSE', [id]);
   if (!result.rows.length) { res.status(404).json({ error: "Product not found." }); return; }
   res.json({ product: result.rows[0] });
 }));
@@ -85,6 +85,11 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
       total += product.price_ugx * qty;
     }
     const demo = found.rows.some(product => product.is_demo);
+    if (demo) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ error: "This item is not available for purchase. Please select a live supplier product." });
+      return;
+    }
     if (!demo && input.paymentMethod !== "card" && !input.phoneNumber) { await client.query("ROLLBACK"); res.status(400).json({ error: "Enter the mobile money phone number." }); return; }
     status = demo ? "demo" : "pending_payment";
     const result = await client.query<{id:string}>(
