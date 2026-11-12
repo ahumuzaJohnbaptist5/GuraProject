@@ -40,7 +40,11 @@ const registerSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(320),
   password: z.string().min(8).max(128),
+  confirmPassword: z.string().min(1),
   role: z.enum(["customer", "technician", "shop"]).default("customer"),
+}).refine((input) => input.password === input.confirmPassword, {
+  message: "Passwords do not match.",
+  path: ["confirmPassword"],
 });
 
 app.get("/health", (_request, response) => response.json({ ok: true, service: "gura-api" }));
@@ -72,9 +76,8 @@ app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, respons
      RETURNING id, name, email, role, location, bio, verified, suspended`,
     [input.name, input.email, passwordHash, input.role],
   );
-  const user = result.rows[0];
-  await createSession(user.id, response);
-  response.status(201).json({ user });
+  // Account creation does not authenticate the user. Sign-in is required.
+  response.status(201).json({ message: "Account created successfully. Please sign in." });
 }));
 
 app.post("/api/auth/login", authRateLimit, asyncRoute(async (request, response) => {

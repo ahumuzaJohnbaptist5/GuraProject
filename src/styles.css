@@ -1100,3 +1100,7 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell .gura-item-photo-preview{display:grid;gap:6px;justify-items:start}
 .app-shell .gura-item-photo-preview button{border:1px solid #d2dfe5;background:#f4f7f9;color:#9d421e;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12px}
 .app-shell .gura-item-photo-preview small{color:#527083;font-weight:700}
+
+/* Confirmation after registration: account creation is not a login session. */
+.app-shell .gura-auth-success{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid #a5dec0;background:#f0fcf5;color:#176a42;border-radius:8px;font-size:13px;font-weight:650;line-height:1.5;margin:14px 0 18px}
+.app-shell .gura-auth-success svg{flex:none;margin-top:1px}
