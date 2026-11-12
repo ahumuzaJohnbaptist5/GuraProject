@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { currentUser, type AuthUser } from "./auth.js";
@@ -191,8 +191,15 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
       "INSERT INTO marketplace_order_items(order_id,product_id,quantity,price_ugx,product_name) VALUES($1,$2,$3,$4,$5)",
       [orderId,product.id,combined.get(product.id),product.price_ugx,product.name],
     );
+    // Bind the receipt to the complete product/quantity/price snapshot without
+    // exposing the customer's phone number or other private payment information.
+    const itemsSnapshot=found.rows.map(product=>({
+      productId:product.id,quantity:combined.get(product.id)!,unitPriceUgx:product.price_ugx,
+    })).sort((a,b)=>a.productId.localeCompare(b.productId));
+    const itemsHash=createHash("sha256").update(JSON.stringify(itemsSnapshot)).digest("hex");
     await appendAudit(client, {actorId:user.id,action:"order.created",subjectType:"order",subjectId:orderId,
-      detail:{amountUgx:total,status,paymentMethod:input.paymentMethod,itemCount:combined.size},highValue:total>=highValueThreshold});
+      detail:{amountUgx:total,status,paymentMethod:input.paymentMethod,itemCount:combined.size,itemsHash},
+      highValue:total>=highValueThreshold});
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
