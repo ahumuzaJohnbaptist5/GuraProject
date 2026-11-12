@@ -56,6 +56,24 @@ const localAuthAdapter: AuthAdapter = {
     writeUsers([...users, stored]);
     return user;
   },
+  async changePassword(currentPassword, newPassword, confirmPassword) {
+    if (newPassword !== confirmPassword) throw new Error("New passwords do not match.");
+    if (newPassword.length < 8) throw new Error("Use at least 8 characters.");
+    if (useApi) {
+      await apiRequest("/api/auth/change-password", {
+        method:"POST",body:JSON.stringify({currentPassword,newPassword,confirmPassword}),
+      });
+      saveSessionUser(null);
+      return;
+    }
+    const active=localAuthAdapter.getCurrentUser();
+    if (!active) throw new Error("Sign in to change your password.");
+    const users=readUsers();
+    const found=users.find(x=>x.id===active.id);
+    if (!found || found.password!==currentPassword) throw new Error("Current password is incorrect.");
+    writeUsers(users.map(x=>x.id===active.id?{...x,password:newPassword}:x));
+    saveSessionUser(null);
+  },
   async login({ email, password }: Credentials) {
     if (useApi) {
       const result = await apiRequest<{ user: User }>("/api/auth/login", {
