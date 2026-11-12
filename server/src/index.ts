@@ -13,7 +13,7 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(cors({ origin: config.webOrigin, credentials: true }));
 app.use(securityHeaders);
-app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly."));
+app.use(rateLimit(60_000, 300, "Too many requests. Please try again shortly.", { skipReadOnly: true }));
 app.use(sameOrigin);
 app.use(express.json({ limit: "8mb" }));
 app.use(cookieParser());
@@ -65,7 +65,7 @@ app.patch("/api/notifications/read", requireUser, asyncRoute(async (request, res
   response.status(204).end();
 }));
 
-const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attempts. Please try again later.");
+const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attempts. Please try again later.", { keyByEmail: true });
 
 app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, response) => {
   const input = registerSchema.parse(request.body);
