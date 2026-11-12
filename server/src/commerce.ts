@@ -5,6 +5,7 @@ import { currentUser, type AuthUser } from "./auth.js";
 import { pool, query } from "./db.js";
 import { config } from "./config.js";
 import { createNotification } from "./notifications.js";
+import { appendAudit, highValueThreshold, withAuditTransaction } from "./auditLedger.js";
 
 export const commerceRouter = Router();
 const asyncRoute = (handler: (req: Request, res: Response) => Promise<void>) =>
@@ -176,6 +177,8 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
       "INSERT INTO marketplace_order_items(order_id,product_id,quantity,price_ugx,product_name) VALUES($1,$2,$3,$4,$5)",
       [orderId,product.id,combined.get(product.id),product.price_ugx,product.name],
     );
+    await appendAudit(client, {actorId:user.id,action:"order.created",subjectType:"order",subjectId:orderId,
+      detail:{amountUgx:total,status,paymentMethod:input.paymentMethod,itemCount:combined.size},highValue:total>=highValueThreshold});
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
@@ -235,11 +238,17 @@ const syncPayment = async (trackingId:string) => {
   if(state==="COMPLETED") {
     // Sandbox payments are never recognized as real funds or deducted from live stock.
     if (process.env.PESAPAL_ENV !== "live") {
-      const test = await query(
-        "UPDATE marketplace_orders SET status='sandbox_paid' WHERE id=$1 AND status='pending_payment' RETURNING id",
-        [order.id],
-      );
-      if (test.rowCount) await createNotification(order.customer_id,"Sandbox payment verified — test only","GURA test order "+order.id.slice(0,8).toUpperCase()+" completed in the payment sandbox. No real money was collected and no stock was deducted.");
+      const changed = await withAuditTransaction(async client => {
+        const test = await client.query(
+          "UPDATE marketplace_orders SET status='sandbox_paid' WHERE id=$1 AND status='pending_payment' RETURNING id",
+          [order.id],
+        );
+        if (test.rowCount) await appendAudit(client,{actorId:order.customer_id,action:"payment.sandbox_confirmed",
+          subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"sandbox_paid"},
+          highValue:Number(order.amount_ugx)>=highValueThreshold});
+        return !!test.rowCount;
+      });
+      if (changed) await createNotification(order.customer_id,"Sandbox payment verified — test only","GURA test order "+order.id.slice(0,8).toUpperCase()+" completed in the payment sandbox. No real money was collected and no stock was deducted.");
       return;
     }
     const client=await pool.connect();
@@ -254,13 +263,21 @@ const syncPayment = async (trackingId:string) => {
           if(!updated.rowCount) throw new Error("Insufficient inventory to fulfill paid order "+order.id);
         }
         await client.query("UPDATE marketplace_orders SET status='paid',paid_at=now() WHERE id=$1",[order.id]);
+        await appendAudit(client,{actorId:order.customer_id,action:"payment.confirmed",
+          subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"paid"},
+          highValue:Number(order.amount_ugx)>=highValueThreshold});
         success=true;
       }
       await client.query("COMMIT");
     }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
     if(success) await createNotification(order.customer_id,"Payment confirmed — order received","Payment verified for GURA order "+order.id.slice(0,8).toUpperCase()+". We have received your order.");
   } else if(state==="FAILED"||state==="REVERSED"){
-    await query("UPDATE marketplace_orders SET status='failed' WHERE id=$1 AND status='pending_payment'",[order.id]);
+    await withAuditTransaction(async client=>{
+      const result=await client.query("UPDATE marketplace_orders SET status='failed' WHERE id=$1 AND status='pending_payment' RETURNING id",[order.id]);
+      if(result.rowCount) await appendAudit(client,{actorId:order.customer_id,action:"payment.failed",
+        subjectType:"order",subjectId:order.id,detail:{amountUgx:order.amount_ugx,status:"failed"},
+        highValue:Number(order.amount_ugx)>=highValueThreshold});
+    });
     await createNotification(order.customer_id,"Order payment "+state.toLowerCase(),"Payment for order "+order.id.slice(0,8).toUpperCase()+" was not confirmed.");
   }
 };
