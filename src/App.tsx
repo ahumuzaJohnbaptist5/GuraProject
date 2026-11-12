@@ -130,6 +130,9 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "customer" as Role });
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -139,13 +142,20 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
       setError("Use a password with at least 8 characters.");
       return;
     }
+    if (mode === "register" && form.password !== confirmPassword) {
+      setError("Passwords do not match. Please confirm your password.");
+      return;
+    }
     setLoading(true);
     try {
-      const user = mode === "login"
-        ? await auth.login({ email: form.email.trim(), password: form.password })
-        : await auth.register({ id: crypto.randomUUID(), name: form.name, email: form.email.trim(), role: form.role }, form.password);
-      onAuth(user);
-      navigate("/dashboard");
+      if (mode === "register") {
+        await auth.register({ id: crypto.randomUUID(), name: form.name, email: form.email.trim(), role: form.role }, form.password);
+        navigate("/login?registered=1", { replace: true });
+      } else {
+        const user = await auth.login({ email: form.email.trim(), password: form.password });
+        onAuth(user);
+        navigate("/dashboard");
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
       // Do not reveal whether an email address is registered or which credential failed.
@@ -170,6 +180,7 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
         <p className="eyebrow">{mode === "login" ? "Welcome back" : "Join the GURA network"}</p>
         <h1>{mode === "login" ? "Sign in to GURA" : "Create your account"}</h1>
         <p className="muted-text">{mode === "login" ? "Enter your account credentials to continue." : "Tell us a little about yourself to get started."}</p>
+        {mode === "login" && searchParams.get("registered") === "1" && <div className="gura-auth-success" role="status"><CheckCircle2 size={19}/><span>Account created successfully! Please sign in with your email and password.</span></div>}
         <form onSubmit={submit} className="gura-login-form">
           {mode === "register" && <>
             <label>Full name<input required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}/></label>
@@ -186,6 +197,14 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: (user:
               </button>
             </span>
           </label>
+          {mode === "register" && <label>Confirm password
+            <span className="gura-password-field">
+              <input required type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password"/>
+              <button type="button" className="gura-password-toggle" onClick={() => setShowConfirmPassword(value => !value)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"} aria-pressed={showConfirmPassword}>
+                {showConfirmPassword ? <EyeOff size={19}/> : <Eye size={19}/>}
+              </button>
+            </span>
+          </label>}
           {error && <div className="gura-auth-error" role="alert"><AlertTriangle size={18}/><span>{error}</span></div>}
           <button className="button full gura-auth-submit" type="submit" disabled={loading} aria-busy={loading}>
             {loading && <LoaderCircle size={18} className="gura-spinner" aria-hidden="true"/>}
