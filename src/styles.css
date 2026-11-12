@@ -1120,3 +1120,56 @@ body,.app-shell{font-family:"Inter",sans-serif;background:var(--gura-bg);color:v
 .app-shell .gura-marketplace-contacts>strong{width:100%;font-size:13px;color:#244451}
 .app-shell .gura-marketplace-contacts>a{display:inline-flex;padding:8px 11px;border:1px solid #c5d8dc;background:#f0f8f9;color:#176073;font-weight:750;font-size:12px;border-radius:6px;text-decoration:none}
 .app-shell .gura-marketplace-contacts>a:hover{background:#e0f1f3}
+
+
+/* GURA homepage: light editorial theme with visible electronics background. */
+.app-shell .gura-tech-home{background:#ffffff;color:#18333d}
+.app-shell:has(.gura-tech-home) .site-header{background:#ffffff;border-bottom:1px solid #dde7e9;box-shadow:0 2px 12px rgba(27,56,63,.05)}
+.app-shell:has(.gura-tech-home) .site-header .nav a:not(.button),
+.app-shell:has(.gura-tech-home) .site-header .nav-logout,
+.app-shell:has(.gura-tech-home) .site-header .menu-button{color:#213b44}
+.app-shell:has(.gura-tech-home) .site-header .nav a:hover{color:#c35b24}
+.app-shell:has(.gura-tech-home) .gura-cart-nav{color:#b95121}
+.app-shell .gura-tech-hero{background:#f2f8fa;color:#1a3540}
+.app-shell .gura-tech-hero:before{
+  background-image:linear-gradient(90deg,rgba(249,252,253,.94) 0%,rgba(246,251,252,.84) 46%,rgba(241,249,251,.58) 100%),url("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2000&q=85");
+  background-position:center;
+  background-size:cover
+}
+.app-shell .gura-tech-hero:after{background:linear-gradient(0deg,rgba(250,253,253,.92) 0%,transparent 22%)}
+.app-shell .gura-tech-kicker{background:#d9f5fa;color:#126175}
+.app-shell .gura-tech-hero h1{color:#102d38}
+.app-shell .gura-tech-hero h1 em{color:#0985a7}
+.app-shell .gura-tech-intro{color:#365662;border-left-color:#ed7a35}
+.app-shell .gura-tech-search-field,
+.app-shell .gura-tech-search-location{background:#ffffff;border:1px solid #c5d8df;color:#66838e;box-shadow:0 3px 10px rgba(16,45,56,.06)}
+.app-shell .gura-tech-search-field input,
+.app-shell .gura-tech-search-location select{color:#193741;background:transparent}
+.app-shell .gura-tech-search-field input::placeholder{color:#728a94}
+.app-shell .gura-tech-search-location option{background:#ffffff;color:#193741}
+.app-shell .gura-tech-quick strong{color:#607d87}
+.app-shell .gura-tech-quick button{color:#305461}
+.app-shell .gura-tech-quick button:hover,.app-shell .gura-tech-quick button:focus-visible{color:#b95320}
+.app-shell .gura-tech-search-note{color:#53737f}
+.app-shell .gura-tech-hero-aside{background:rgba(255,255,255,.82);border:1px solid #c5d9e0;border-top:3px solid #e97831;box-shadow:0 16px 40px rgba(28,66,80,.11)}
+.app-shell .gura-tech-hero-aside h2{color:#173440}
+.app-shell .gura-tech-hero-aside h2 span{color:#0988a9}
+.app-shell .gura-tech-hero-aside>div{border-top:1px solid #dce8ec;color:#36545f}
+.app-shell .gura-tech-hero-aside>a{color:#a84b1d}
+.app-shell .gura-tech-proof{border-top:1px solid #cedfe5}
+.app-shell .gura-tech-proof strong{color:#be5a28}
+.app-shell .gura-tech-proof span{color:#516f7c}
+.app-shell .gura-tech-content{background:#ffffff}
+.app-shell .gura-tech-category{background:#e7eff3;color:#173641;border:1px solid #dbe5e9;box-shadow:0 7px 17px rgba(27,62,77,.08)}
+.app-shell .gura-tech-category:before{background:linear-gradient(0deg,rgba(255,255,255,.96) 0%,rgba(252,254,254,.69) 35%,rgba(255,255,255,.04) 100%)}
+.app-shell .gura-tech-category small{color:#3d606b}
+.app-shell .gura-tech-category svg{color:#b75323}
+.app-shell .gura-tech-discovery{background:linear-gradient(115deg,#eaf8fa,#fff7f0);border:1px solid #d4e7e8;color:#1e3b46;box-shadow:0 9px 30px rgba(31,83,95,.06)}
+.app-shell .gura-tech-discovery h2{color:#173440}
+.app-shell .gura-tech-discovery p{color:#52707c}
+.app-shell .gura-tech-discovery-actions a+a{border-color:#9bbbc4;color:#24505d;background:#ffffff}
+.app-shell .gura-tech-benefits{border-top:1px solid #e3edef}
+@media(max-width:720px){
+  .app-shell:has(.gura-tech-home) .site-header .nav.open{background:#fff;border:1px solid #dce8ec;box-shadow:0 10px 24px rgba(20,60,72,.1)}
+  .app-shell .gura-tech-hero:before{background-image:linear-gradient(90deg,rgba(250,252,253,.9),rgba(250,252,253,.7)),url("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2000&q=85")}
+}
