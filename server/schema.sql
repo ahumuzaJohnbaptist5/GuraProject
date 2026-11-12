@@ -174,3 +174,8 @@ VALUES
 ('11111111-1111-4111-8111-111111111103','GURA-DEMO-SSD','512GB Solid-State Drive','Example high-speed storage upgrade. Check whether your system supports SATA or NVMe before choosing a drive.','SSDs & Storage',145000,16,'https://images.unsplash.com/photo-1531492746076-161ca9bcad58?auto=format&fit=crop&w=900&q=85','New','Confirm SATA or NVMe interface', '{"Capacity":"512 GB","Interface":"Check before purchase","Category":"Solid-state storage"}'::jsonb,TRUE),
 ('11111111-1111-4111-8111-111111111104','GURA-DEMO-POWER','Laptop Power Adapter','Illustrative universal laptop adapter listing. The voltage, amperage and connector must match your device.','Chargers & Power',65000,30,'https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=900&q=85','New','Match voltage and connector', '{"Accessory":"Power adapter","Input":"Varies by model","Connector":"Confirm with seller"}'::jsonb,TRUE)
 ON CONFLICT (id) DO NOTHING;
+
+-- Each catalog item belongs to the provider's single business, not a separate business profile.
+ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS business_listing_id UUID REFERENCES listings(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS marketplace_products_owner_idx ON marketplace_products(owner_id, created_at DESC);
