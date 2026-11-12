@@ -19,7 +19,11 @@ const storeCart=(items:CartEntry[])=>{localStorage.setItem(KEY,JSON.stringify(it
 const request=async<T,>(path:string,init?:RequestInit):Promise<T>=>{
   const response=await fetch(API_URL+"/api/commerce"+path,{...init,credentials:"include",headers:{"Content-Type":"application/json",...(init?.headers||{})}});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(data.error||"We couldn't complete your request. Please try again.");
+  if(!response.ok) {
+    if(response.status===429) throw new Error("The GURA service is temporarily limiting requests. Please try again shortly. If this continues, contact support.");
+    if(response.status===401) throw new Error("Your session has expired. Please sign in again.");
+    throw new Error(data.error||`The marketplace request failed (HTTP ${response.status}). Please try again.`);
+  }
   return data as T;
 };
 const useProducts=()=>{
@@ -47,7 +51,8 @@ export function ShopPage(){
   useEffect(()=>{
     let active=true;
     fetch(API_URL+"/api/listings",{credentials:"include"}).then(async response=>{
-      if(!response.ok)throw new Error("Unable to load local business listings.");
+      if(response.status===429)throw new Error("GURA is temporarily limiting requests for business listings. Please try again shortly.");
+      if(!response.ok)throw new Error(`Unable to load local business listings (HTTP ${response.status}).`);
       return await response.json() as {listings:ProviderListing[]};
     }).then(data=>{if(active)setProviders(data.listings.filter(p=>p.moderationStatus!=="rejected"))})
       .catch(error=>{if(active)setProvidersError(error instanceof Error?error.message:"Unable to load businesses.")});
