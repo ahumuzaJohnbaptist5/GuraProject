@@ -122,31 +122,66 @@ app.patch("/api/auth/me", requireUser, asyncRoute(async (request, response) => {
     location: z.string().trim().max(160).nullable().optional(),
     bio: z.string().trim().max(2000).nullable().optional(),
     locationImages: z.array(locationImage).max(4).optional(),
+    businessPhone: z.string().trim().regex(/^\+?[0-9 ]{9,18}$/).or(z.literal("")).optional(),
+    businessWhatsapp: z.string().trim().regex(/^\+?[0-9 ]{9,18}$/).or(z.literal("")).optional(),
+    businessEmail: z.string().trim().email().max(320).or(z.literal("")).optional(),
   }).parse(request.body);
   if (input.locationImages !== undefined && !["shop", "technician"].includes(user.role)) {
     response.status(403).json({ error: "Only shops and technicians can upload premises photos." });
     return;
+  }
+  if ((input.businessPhone !== undefined || input.businessWhatsapp !== undefined || input.businessEmail !== undefined) && !["shop","technician"].includes(user.role)) {
+    response.status(403).json({error:"Business contact fields require a provider account."}); return;
   }
   const result = await query<AuthUser>(
     `UPDATE users SET
         name = COALESCE($1, name),
         location = COALESCE($2, location),
         bio = COALESCE($3, bio),
-        location_images = COALESCE($4, location_images)
-      WHERE id = $5
+        location_images = COALESCE($4, location_images),
+        business_phone = COALESCE($5, business_phone),
+        business_whatsapp = COALESCE($6, business_whatsapp),
+        business_email = COALESCE($7, business_email)
+      WHERE id = $8
       RETURNING id, name, email, role, location, bio,
-        location_images AS "locationImages", verified, suspended`,
-    [input.name ?? null, input.location ?? null, input.bio ?? null, input.locationImages ?? null, user.id],
+        location_images AS "locationImages", business_phone AS "businessPhone", business_whatsapp AS "businessWhatsapp", business_email AS "businessEmail", verified, suspended`,
+    [input.name ?? null, input.location ?? null, input.bio ?? null, input.locationImages ?? null, input.businessPhone ?? null, input.businessWhatsapp ?? null, input.businessEmail ?? null, user.id],
   );
   response.json({ user: result.rows[0] });
 }));
 
+app.post("/api/auth/change-password", requireUser, asyncRoute(async (request, response) => {
+  const user = response.locals.user as AuthUser;
+  const input = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8).max(128),
+    confirmPassword: z.string().min(1),
+  }).refine(v => v.newPassword === v.confirmPassword, {path:["confirmPassword"],message:"New passwords do not match."}).parse(request.body);
+  const result = await query<{password_hash:string}>("SELECT password_hash FROM users WHERE id=$1", [user.id]);
+  if(!result.rows[0] || !await verifyPassword(input.currentPassword,result.rows[0].password_hash)){
+    response.status(400).json({error:"Current password is incorrect."});return;
+  }
+  if(input.currentPassword===input.newPassword){response.status(400).json({error:"Choose a different new password."});return;}
+  const hashed=await hashPassword(input.newPassword);
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    await client.query("UPDATE users SET password_hash=$1 WHERE id=$2",[hashed,user.id]);
+    await client.query("DELETE FROM sessions WHERE user_id=$1",[user.id]);
+    await client.query("COMMIT");
+  }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+  await destroySession(request,response);
+  response.json({message:"Password updated. Sign in again."});
+}));
+
 app.get("/api/listings", asyncRoute(async (_request, response) => {
   const result = await query(
-    `SELECT id, owner_id AS "ownerId", name, type, location, text, services,
-            image_urls AS "images", verified, rating, availability,
-            moderation_status AS "moderationStatus"
-     FROM listings WHERE moderation_status IN ('pending', 'approved') ORDER BY CASE WHEN moderation_status = 'approved' THEN 0 ELSE 1 END, rating DESC, created_at DESC`,
+    `SELECT l.id, l.owner_id AS "ownerId", l.name, l.type, l.location, l.text, l.services,
+            l.image_urls AS "images", l.verified, l.rating, l.availability,
+            l.moderation_status AS "moderationStatus",
+            u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail"
+     FROM listings l LEFT JOIN users u ON u.id=l.owner_id
+     WHERE l.moderation_status IN ('pending', 'approved') ORDER BY CASE WHEN l.moderation_status = 'approved' THEN 0 ELSE 1 END, l.rating DESC, l.created_at DESC`,
   );
   response.json({ listings: result.rows });
 }));
