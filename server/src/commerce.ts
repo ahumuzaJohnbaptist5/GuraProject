@@ -239,17 +239,18 @@ commerceRouter.post("/orders/:id/pay", protect, asyncRoute(async (req,res) => {
     }),
   });
   if(typeof result.order_tracking_id !== "string" || typeof result.redirect_url !== "string") throw new Error("Payment gateway did not provide a checkout link.");
+  const trackingId: string = result.order_tracking_id;
   const url = new URL(result.redirect_url);
   if (!["cybqa.pesapal.com","pay.pesapal.com"].includes(url.hostname) || url.protocol!=="https:") throw new Error("Unexpected payment destination.");
   const recorded=await withAuditTransaction(async client=>{
     const changed=await client.query(
       "UPDATE marketplace_orders SET payment_tracking_id=$1 WHERE id=$2 AND payment_tracking_id IS NULL AND status='pending_payment' RETURNING id",
-      [result.order_tracking_id,id],
+      [trackingId,id],
     );
     if(!changed.rowCount)return false;
     await appendAudit(client,{actorId:user.id,action:"payment.initiated",
       subjectType:"order",subjectId:id,detail:{amountUgx:item.amount_ugx,
-        trackingHash:createHash("sha256").update(result.order_tracking_id).digest("hex")},
+        trackingHash:createHash("sha256").update(trackingId).digest("hex")},
       highValue:Number(item.amount_ugx)>=highValueThreshold});
     return true;
   });
