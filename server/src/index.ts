@@ -10,7 +10,7 @@ import { createNotification } from "./notifications.js";
 import { commerceRouter } from "./commerce.js";
 import { appendAudit, verifyLedger, withAuditTransaction } from "./auditLedger.js";
 
-const app = express();
+export const app = express();
 app.set("trust proxy", 1);
 app.use(cors({ origin: config.webOrigin, credentials: true }));
 app.use(securityHeaders);
@@ -784,7 +784,7 @@ app.use((error: unknown, _request: Request, response: Response, _next: NextFunct
 });
 
 // Private administrator provisioning. No public admin registration or credentials in source.
-const provisionAdministrator = async () => {
+export const provisionAdministrator = async () => {
   const email = (process.env.GURA_ADMIN_EMAIL || "").trim().toLowerCase();
   const password = process.env.GURA_ADMIN_PASSWORD || "";
   if (!email && !password) return;
@@ -824,9 +824,13 @@ const provisionAdministrator = async () => {
   else console.warn("Administrator provisioning skipped due to an existing conflicting account.");
 };
 
-void provisionAdministrator()
-  .then(() => app.listen(config.port, () => console.log(`Gura API listening on http://127.0.0.1:${config.port}`)))
-  .catch((error) => {
-    console.error("Gura startup failed:", error);
-    process.exitCode = 1;
-  });
+// The single-service deployment imports this Express app directly into the
+// web server. In that mode, do not bind a second HTTP port.
+if (process.env.GURA_EMBEDDED_API !== "1") {
+  void provisionAdministrator()
+    .then(() => app.listen(config.port, () => console.log(`Gura API listening on http://127.0.0.1:${config.port}`)))
+    .catch((error) => {
+      console.error("Gura startup failed:", error);
+      process.exitCode = 1;
+    });
+}
