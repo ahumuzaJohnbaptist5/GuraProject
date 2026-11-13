@@ -22,9 +22,26 @@ const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_u
 const pesapalBase = process.env.PESAPAL_ENV === "live" ? "https://pay.pesapal.com/v3/api" : "https://cybqa.pesapal.com/pesapalv3/api";
 const pesapalEnabled = Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET && process.env.PESAPAL_IPN_ID);
 const moneyRequest = async (path: string, init?: RequestInit) => {
+  // Never log the request body, authorization headers, bearer token, or the
+  // complete provider response: any of those may contain payment secrets.
+  const operation = path === "/Auth/RequestToken" ? "authentication"
+    : path === "/Transactions/SubmitOrderRequest" ? "submit_order"
+    : path === "/Transactions/GetTransactionStatus" ? "verify_payment"
+    : "other";
   const response = await fetch(pesapalBase + path, { ...init, signal: AbortSignal.timeout(15_000), headers: { Accept: "application/json", "Content-Type": "application/json", ...(init?.headers ?? {}) } });
-  const body = await response.json() as Record<string, unknown>;
-  if (!response.ok || body.error && typeof body.error === "object") throw new Error("Payment service request failed. Please retry later.");
+  const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || !body || (body.error && typeof body.error === "object")) {
+    const errorObject = body?.error && typeof body.error === "object"
+      ? body.error as Record<string, unknown> : null;
+    const rawCode = errorObject?.code ?? body?.error_code;
+    const providerCode = typeof rawCode === "string" && /^[a-zA-Z0-9_.-]{1,64}$/.test(rawCode)
+      ? rawCode : "unavailable";
+    console.error("Pesapal API rejected request", {
+      operation, environment: process.env.PESAPAL_ENV === "live" ? "live" : "sandbox",
+      status: response.status, providerCode,
+    });
+    throw new Error("Payment service request failed. Please retry later.");
+  }
   return body;
 };
 const pesapalToken = async () => {
