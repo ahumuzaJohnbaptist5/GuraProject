@@ -19,4 +19,6 @@ jobs:
         run: npm ci
       - name: Compile and bundle
         run: npm run build
+      - name: Verify marketplace proxy cache and session isolation
+        run: node tests/catalog-proxy.test.mjs
 
