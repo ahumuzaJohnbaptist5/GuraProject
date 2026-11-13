@@ -11,7 +11,7 @@ export type ShopProduct = {
 };
 type ProviderListing={id:string;name:string;type:"shop"|"technician"|"seller";location:string;text:string;images?:string[];verified:boolean;moderationStatus:"pending"|"approved"|"rejected";businessPhone?:string;businessWhatsapp?:string;businessEmail?:string};
 type CartEntry={productId:string;quantity:number};
-type Order={id:string;status:string;paymentMethod:string;amountUgx:number;createdAt:string;items:{productId:string;quantity:number;name:string;priceUgx:number}[]};
+type Order={id:string;status:string;paymentMethod:string;paymentInitiated:boolean;amountUgx:number;createdAt:string;items:{productId:string;quantity:number;name:string;priceUgx:number}[]};
 const KEY="gura-marketplace-cart";
 const API_URL=import.meta.env.PROD?"":((import.meta.env.VITE_API_URL as string|undefined)?.trim() || "http://localhost:8787").replace(/\/+$/,"");
 const money=(n:number)=>"UGX "+n.toLocaleString("en-UG");
@@ -133,7 +133,7 @@ export function CartPage(){
 }
 export function CheckoutPage({user}:{user:User|null}){
   const navigate=useNavigate();const {products,loading,error:loadError,retryLoad}=useProducts();const [entries]=useState<CartEntry[]>(getCart);
-  const [method,setMethod]=useState<"mtn"|"airtel"|"card">("mtn");const [phone,setPhone]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [sessionChecked,setSessionChecked]=useState(false);const [confirmedUser,setConfirmedUser]=useState<User|null>(null);
+  const [method,setMethod]=useState<"mtn"|"airtel"|"card">("mtn");const [phone,setPhone]=useState("");const [busy,setBusy]=useState(false);const [createdOrderId,setCreatedOrderId]=useState<string|null>(null);const [error,setError]=useState("");const [sessionChecked,setSessionChecked]=useState(false);const [confirmedUser,setConfirmedUser]=useState<User|null>(null);
   useEffect(()=>{
     let active=true;
     fetch(API_URL+"/api/auth/me",{credentials:"include"}).then(async res=>{
@@ -146,11 +146,13 @@ export function CheckoutPage({user}:{user:User|null}){
   const total=lines.reduce((sum,x)=>sum+x.product.priceUgx*x.entry.quantity,0);
   const place=async()=>{
     if(!confirmedUser){setError("Your session could not be verified. Please sign in again.");return;}
+    if(createdOrderId){navigate("/orders?paymentError=1");return;}
     setBusy(true);setError("");
     try{
       const result=await request<{order:{id:string;status:string;amountUgx:number};paymentAvailable:boolean}>("/orders",{
         method:"POST",body:JSON.stringify({items:lines.map(x=>({productId:x.product.id,quantity:x.entry.quantity})),paymentMethod:method,...(method!=="card"?{phoneNumber:phone}:{})}),
       });
+      setCreatedOrderId(result.order.id);
       storeCart([]);
 
       if(result.paymentAvailable){
@@ -165,20 +167,62 @@ export function CheckoutPage({user}:{user:User|null}){
     {!sessionChecked&&<div className="gura-shop-warning">Checking your sign-in session...</div>}{sessionChecked&&!confirmedUser&&<div className="gura-shop-warning">Your session is not active. Please <Link to="/login">sign in again</Link> to continue checkout.</div>}
 
     {lines.some(x=>!x.product.sellerVerified)&&<p className="gura-shop-warning" role="status">Some products are from sellers who are Not Yet Verified by GURA. Please review seller details before purchasing.</p>}<div className="gura-cart-layout"><section className="gura-checkout-options"><h2>Choose payment method</h2><label className={method==="mtn"?"active":""}><input type="radio" name="method" checked={method==="mtn"} onChange={()=>setMethod("mtn")}/> <span><b>MTN MoMo Pay</b><small>Authorize payment on your MTN phone</small></span></label><label className={method==="airtel"?"active":""}><input type="radio" name="method" checked={method==="airtel"} onChange={()=>setMethod("airtel")}/> <span><b>Airtel Money</b><small>Authorize payment on your Airtel phone</small></span></label><label className={method==="card"?"active":""}><input type="radio" name="method" checked={method==="card"} onChange={()=>setMethod("card")}/> <span><b>Debit / credit card</b><small>Enter card details only on the secure payment provider page</small></span></label>{method!=="card"&&<div className="gura-checkout-phone"><label htmlFor="gura-payment-phone">Mobile money number</label><input id="gura-payment-phone" type="tel" inputMode="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07XXXXXXXX" autoComplete="tel"/><small>A PIN request will appear through your mobile money provider when live payments are enabled. Never share your PIN with GURA.</small></div>}<p className="gura-shop-note">Live payments use a hosted gateway. We do not collect mobile-money PINs, card numbers or CVVs.</p></section>
-    <aside className="gura-cart-summary"><h2>Checkout summary</h2>{lines.map(x=><p key={x.product.id}>{x.product.name} × {x.entry.quantity}<b>{money(x.product.priceUgx*x.entry.quantity)}</b></p>)}<div className="gura-cart-total">Total <strong>{money(total)}</strong></div>{error&&<p role="alert" className="gura-shop-error">{error}</p>}<button className="gura-shop-primary" disabled={busy||loading||!!loadError||!sessionChecked||!confirmedUser||!lines.length||lines.some(x=>x.entry.quantity>x.product.availableUnits)||(method!=="card"&&!/^(?:\+?256|0)7[0-9]{8}$/.test(phone))} onClick={place}>{busy?"Processing...":"Pay securely"} <ArrowRight size={17}/></button><small>Orders remain unpaid until the gateway confirms payment. Listed availability can change before payment is verified.</small></aside></div>
+    <aside className="gura-cart-summary"><h2>Checkout summary</h2>{lines.map(x=><p key={x.product.id}>{x.product.name} × {x.entry.quantity}<b>{money(x.product.priceUgx*x.entry.quantity)}</b></p>)}<div className="gura-cart-total">Total <strong>{money(total)}</strong></div>{error&&<p role="alert" className="gura-shop-error">{error}</p>}{createdOrderId&&<p className="gura-shop-warning" role="status">Order #{createdOrderId.slice(0,8).toUpperCase()} has been created. Do not submit another order. <Link to="/orders?paymentError=1">Resume payment in My Orders</Link></p>}<button className="gura-shop-primary" disabled={!!createdOrderId||busy||loading||!!loadError||!sessionChecked||!confirmedUser||!lines.length||lines.some(x=>x.entry.quantity>x.product.availableUnits)||(method!=="card"&&!/^(?:\+?256|0)7[0-9]{8}$/.test(phone))} onClick={place}>{busy?"Processing...":createdOrderId?"Order already created":"Pay securely"} <ArrowRight size={17}/></button><small>Orders remain unpaid until the gateway confirms payment. Listed availability can change before payment is verified.</small></aside></div>
   </main>;
 }
 export function OrdersPage({user}:{user:User|null}){
-  const [search]=useSearchParams();const [orders,setOrders]=useState<Order[]>([]);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
-  const load=async()=>{setBusy(true);setError("");try{const r=await request<{orders:Order[]}>("/orders");setOrders(r.orders);}catch(e){setError(e instanceof Error?e.message:"Could not load orders.")}finally{setBusy(false)}};
-  useEffect(()=>{if(user)void load()},[user]);
-  const verify=async(orderId:string)=>{setBusy(true);try{await request("/orders/"+orderId+"/verify");const r=await request<{orders:Order[]}>("/orders");setOrders(r.orders);}catch(e){setError(e instanceof Error?e.message:"Could not verify payment.")}finally{setBusy(false)}};
-  return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">Your GURA account</p><h1>My orders</h1><p>Track checkout and payment confirmation for your GURA orders.</p></div><button className="gura-shop-cart-link" disabled={busy} onClick={()=>void load()}><RefreshCcw size={17}/> Refresh</button></header>
-
-    {search.has("pending")&&<div className="gura-shop-warning">Order recorded as awaiting payment. Payment collection is not yet configured. No funds were charged.</div>}
-    {search.has("returned")&&<div className="gura-shop-warning">Returned from the payment provider. Check your order status below; only verified payment will show as paid.</div>}
+  const [search]=useSearchParams();
+  const [orders,setOrders]=useState<Order[]>([]);
+  const [busyOrder,setBusyOrder]=useState<string|null>(null);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const load=async()=>{
+    setLoading(true);setError("");
+    try{
+      const result=await request<{orders:Order[]}>("/orders");
+      setOrders(result.orders);
+    }catch(cause){setError(cause instanceof Error?cause.message:"Could not load orders.")}
+    finally{setLoading(false)}
+  };
+  useEffect(()=>{if(user)void load()},[user?.id]);
+  const verify=async(orderId:string)=>{
+    setBusyOrder(orderId);setError("");setNotice("");
+    try{
+      await request("/orders/"+orderId+"/verify");
+      const result=await request<{orders:Order[]}>("/orders");
+      setOrders(result.orders);
+      const updated=result.orders.find(order=>order.id===orderId);
+      setNotice(updated?.status==="pending_payment"
+        ?"The payment provider has not confirmed this payment yet."
+        :"Payment status refreshed for order #"+orderId.slice(0,8).toUpperCase()+".");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Could not verify payment.")}
+    finally{setBusyOrder(null)}
+  };
+  const resume=async(order:Order)=>{
+    if(order.status!=="pending_payment"||order.paymentInitiated)return;
+    setBusyOrder(order.id);setError("");setNotice("");
+    try{
+      // Only start payment for this existing order. No new order is created.
+      const pay=await request<{redirectUrl:string}>("/orders/"+order.id+"/pay",{method:"POST",body:"{}"});
+      window.location.assign(pay.redirectUrl);
+    }catch(cause){
+      setError("Unable to start payment for order #"+order.id.slice(0,8).toUpperCase()+": "+
+        (cause instanceof Error?cause.message:"Payment service unavailable.")+
+        " Your order remains pending. Check its status before retrying.");
+      // Refresh the server's tracking state before offering another attempt.
+      try{const latest=await request<{orders:Order[]}>("/orders");setOrders(latest.orders);}
+      catch{ /* Preserve the existing orders while showing the original error. */ }
+    }finally{setBusyOrder(null)}
+  };
+  return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">Your GURA account</p><h1>My orders</h1><p>Track checkout and payment confirmation for your GURA orders.</p></div><button className="gura-shop-cart-link" disabled={loading||!!busyOrder} onClick={()=>void load()}><RefreshCcw size={17}/> Refresh</button></header>
+    {search.has("pending")&&<div className="gura-shop-warning">Your order was saved without starting payment. Select Resume payment below when available.</div>}
+    {search.has("paymentError")&&<div className="gura-shop-warning">An order was already created. Resume payment from its existing order card rather than checking out again.</div>}
+    {search.has("returned")&&<div className="gura-shop-warning">Returned from Pesapal. Check payment status below; only verified payment is recorded as paid.</div>}
+    {loading&&<p role="status">Loading orders...</p>}
     {error&&<p className="gura-shop-error" role="alert">{error}</p>}
-    {!user?<p><Link to="/login">Sign in</Link> to view your orders.</p>:<div className="gura-order-list">{orders.map(order=><article className="gura-order-card" key={order.id}><div className="gura-order-head"><div><strong>Order #{order.id.slice(0,8).toUpperCase()}</strong><small>{new Date(order.createdAt).toLocaleString("en-UG")}</small></div><span className={"gura-order-status "+order.status}>{order.status.replace("_"," ")}</span></div><div>{order.items.map(item=><p key={item.productId}>{item.quantity} × {item.name}<b>{money(item.priceUgx*item.quantity)}</b></p>)}</div><footer><strong>Total: {money(order.amountUgx)}</strong>{order.status==="pending_payment"&&<button onClick={()=>void verify(order.id)} disabled={busy}><RefreshCcw size={16}/> Verify payment</button>}</footer></article>)}{!orders.length&&!busy&&<div className="gura-shop-empty"><Package size={34}/><h2>No orders yet</h2><Link className="gura-shop-primary" to="/shop">Browse products</Link></div>}</div>}
+    {notice&&<p className="gura-shop-warning" role="status">{notice}</p>}
+    {!user?<p><Link to="/login">Sign in</Link> to view your orders.</p>:<div className="gura-order-list">{orders.map(order=><article className="gura-order-card" key={order.id}><div className="gura-order-head"><div><strong>Order #{order.id.slice(0,8).toUpperCase()}</strong><small>{new Date(order.createdAt).toLocaleString("en-UG")}</small></div><span className={"gura-order-status "+order.status}>{order.status.replace("_"," ")}</span></div><div>{order.items.map(item=><p key={item.productId}>{item.quantity} × {item.name}<b>{money(item.priceUgx*item.quantity)}</b></p>)}</div><footer><strong>Total: {money(order.amountUgx)}</strong>{order.status==="pending_payment"&&<div className="request-actions">{order.paymentInitiated?<button type="button" onClick={()=>void verify(order.id)} disabled={loading||!!busyOrder}><RefreshCcw size={16}/> {busyOrder===order.id?"Checking...":"Check payment status"}</button>:<><button type="button" onClick={()=>void verify(order.id)} disabled={loading||!!busyOrder}><RefreshCcw size={16}/> Check status</button><button type="button" onClick={()=>void resume(order)} disabled={loading||!!busyOrder}><ArrowRight size={16}/> {busyOrder===order.id?"Connecting...":"Resume payment"}</button></>}</div>}</footer>{order.status==="pending_payment"&&order.paymentInitiated&&<small>Payment was already initiated. Check status before attempting another payment.</small>}</article>)}{!orders.length&&!loading&&<div className="gura-shop-empty"><Package size={34}/><h2>No orders yet</h2><Link className="gura-shop-primary" to="/shop">Browse products</Link></div>}</div>}
   </main>;
 }
 
