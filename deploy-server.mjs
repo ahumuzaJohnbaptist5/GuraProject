@@ -40,6 +40,29 @@ const serve = async (request, response) => {
 
 // Keep API requests same-origin so browsers send session cookies reliably.
 const apiOrigin = new URL(process.env.API_PROXY_TARGET || "https://gura-api-272p.onrender.com");
+// Opt-in single-service mode: the same Free Render web instance serves the
+// public React site and calls Express directly, avoiding public API-hop 429s.
+// The existing production proxy remains the default until environment secrets
+// have been configured on gura-web and the new deployment is accepted.
+const embeddedMode = process.env.GURA_EMBEDDED_API === "1";
+let embeddedApp = null;
+if (embeddedMode) {
+  for (const key of ["DATABASE_URL", "WEB_ORIGIN", "AUDIT_SIGNING_KEY"]) {
+    if (!process.env[key]) throw new Error("Single-service GURA requires "+key);
+  }
+  if (process.env.AUDIT_SIGNING_KEY.length < 32) {
+    throw new Error("Single-service GURA requires an audit signing key of at least 32 characters");
+  }
+  const expectedOrigin = "https://gura-web-bkid.onrender.com";
+  if (process.env.NODE_ENV === "production" &&
+      process.env.WEB_ORIGIN.replace(/\/+$/, "") !== expectedOrigin) {
+    throw new Error("GURA WEB_ORIGIN must be the current public website URL");
+  }
+  const api = await import("./server/dist/index.js");
+  await api.provisionAdministrator();
+  embeddedApp = api.app;
+  console.log("Gura single-service API enabled: requests are handled in-process");
+}
 // Only public, identical-for-everyone catalogue responses may be shared.
 // Never cache identity, admin, checkout, payment or other user-specific APIs.
 const catalogPaths = new Map([
@@ -183,6 +206,11 @@ const proxyApi = async (request, response) => {
 };
 
 createServer((request, response) => {
+  if (embeddedApp && (((request.url || "").startsWith("/api/")) ||
+      ((request.url || "").split("?")[0] === "/health"))) {
+    embeddedApp(request, response);
+    return;
+  }
   if ((request.url || "").startsWith("/api/")) {
     void proxyApi(request, response);
     return;

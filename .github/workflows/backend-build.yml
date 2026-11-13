@@ -52,3 +52,26 @@ jobs:
           node -e 'fetch("http://127.0.0.1:8787/api/commerce/catalog").then(async r => { const d=await r.json(); if (!r.ok || !Array.isArray(d.products) || !d.pagination) process.exit(1); }).catch(() => process.exit(1))'
       - name: Gate core registration, session, catalogue and access-control flows
         run: RELEASE_SMOKE_ALLOW_WRITES=1 node scripts/release-smoke.mjs
+      - name: Build combined web and API for free single-service mode
+        working-directory: .
+        run: npm ci && npm run build
+      - name: Verify embedded API without any upstream public HTTP hop
+        working-directory: .
+        env:
+          GURA_EMBEDDED_API: "1"
+          AUDIT_SIGNING_KEY: "ci-only-development-audit-signing-key-123456"
+          API_PROXY_TARGET: "http://127.0.0.1:9"
+          PORT: "8788"
+          WEB_ORIGIN: "https://gura-web-bkid.onrender.com"
+        run: |
+          node deploy-server.mjs > /tmp/gura-embedded.log 2>&1 &
+          echo $! > /tmp/gura-embedded.pid
+          trap 'kill $(cat /tmp/gura-embedded.pid) 2>/dev/null || true' EXIT
+          for i in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:8788/health >/dev/null; then break; fi
+            sleep 0.2
+          done
+          curl --fail --silent http://127.0.0.1:8788/ | grep -qi "html"
+          cd server
+          RELEASE_SMOKE_ALLOW_WRITES=1 RELEASE_SMOKE_BASE_URL=http://127.0.0.1:8788 node scripts/release-smoke.mjs
+
