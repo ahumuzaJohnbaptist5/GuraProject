@@ -1,3 +1,4 @@
+import { fetchMarketplaceGet } from "./marketplaceFetch";
 import type { AuditEvent, Listing, ListingReport, Message, Notification, Review, ServiceRequest, User } from "./types";
 
 const LISTINGS_KEY = "gura-listings";
@@ -50,6 +51,7 @@ export const refreshListings = async (): Promise<Listing[]> => {
 };
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+  if((init?.method||"GET").toUpperCase()==="GET") return fetchMarketplaceGet<T>(`${API_URL}${path}`);
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     credentials: "include",

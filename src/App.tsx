@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, Check, CheckCircle2, ClipboardList, Download
 import auth, { refreshSession } from "./auth";
 import { prepareListingPhotos } from "./listingPhotos";
 import { CartHeaderLink, CartPage, CheckoutPage, OrdersPage, ProductPage, ShopPage, ProviderInventory } from "./Shop";
+import { fetchMarketplaceGet } from "./marketplaceFetch";
 import { confirmRequestDate, createAuditEvent, createListing, createMessage, createReport, createRequest, createReview, domainAdapter, exportDomainData, getListingRating, hydrateDomain, listAuditEvents, listFavorites, listListings, listMessages, listNotifications, listReports, listRequests, listReviews, markNotificationsRead, resetDomainData, toggleFavorite, updateListing, updateListingStatus, updateReportStatus, updateRequest } from "./data";
 import type { Listing, ListingType, Role, ServiceRequest, User } from "./types";
 
@@ -53,24 +54,38 @@ function FreshHome() {
   const [businesses,setBusinesses]=useState<HomeBusiness[]>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
+  const [retryCount,setRetryCount]=useState(0);
+  const [productsReady,setProductsReady]=useState(false);
+  const [businessesReady,setBusinessesReady]=useState(false);
   useEffect(()=>{
-    let active=true;
+    const controller=new AbortController();
     const load=async()=>{
+      setLoading(true);
+      setError("");
       const results=await Promise.allSettled([
-        fetch("/api/commerce/products",{credentials:"include",cache:"no-store"}).then(async res=>{if(!res.ok)throw new Error("Products are temporarily unavailable.");return await res.json() as {products:HomeProduct[]}}),
-        fetch("/api/listings",{credentials:"include",cache:"no-store"}).then(async res=>{if(!res.ok)throw new Error("Business listings are temporarily unavailable.");return await res.json() as {listings:HomeBusiness[]}}),
+        fetchMarketplaceGet<{products:HomeProduct[]}>("/api/commerce/products",{signal:controller.signal}),
+        fetchMarketplaceGet<{listings:HomeBusiness[]}>("/api/listings",{signal:controller.signal}),
       ]);
-      if(!active)return;
-      if(results[0].status==="fulfilled")setProducts(results[0].value.products.filter(item=>!item.isDemo));
-      if(results[1].status==="fulfilled")setBusinesses(results[1].value.listings.filter(item=>item.moderationStatus!=="rejected"));
-      if(results[0].status==="rejected"&&results[1].status==="rejected")setError("The marketplace is temporarily unavailable. Please try again.");
-      else if(results[0].status==="rejected")setError("Products are temporarily unavailable; business listings can still be browsed.");
-      else if(results[1].status==="rejected")setError("Business profiles are temporarily unavailable; products can still be browsed.");
+      if(controller.signal.aborted)return;
+      if(results[0].status==="fulfilled"){
+        setProducts(results[0].value.products.filter(item=>!item.isDemo));
+        setProductsReady(true);
+      }
+      if(results[1].status==="fulfilled"){
+        setBusinesses(results[1].value.listings.filter(item=>item.moderationStatus!=="rejected"));
+        setBusinessesReady(true);
+      }
+      if(results[0].status==="rejected"&&results[1].status==="rejected")
+        setError("Marketplace services could not be reached. Please retry loading.");
+      else if(results[0].status==="rejected")
+        setError("Products could not be refreshed. Business listings remain available.");
+      else if(results[1].status==="rejected")
+        setError("Business listings could not be refreshed. Products remain available.");
       setLoading(false);
     };
     void load();
-    return()=>{active=false};
-  },[]);
+    return()=>controller.abort();
+  },[retryCount]);
   const categories=Array.from(new Map(products.map(p=>[p.category,p])).entries()).map(([name,product])=>({name,photo:product.imageUrl,count:products.filter(p=>p.category===name).length}));
   const featured=products.slice(0,8);
   const suppliers=businesses.slice(0,4);
@@ -107,14 +122,14 @@ function FreshHome() {
           </>:<><h2>Discover local electronics businesses</h2><p>New supplier products will appear here as they are published.</p><Link className="gura-live-item-link" to="/directory">Browse businesses <ArrowRight size={16}/></Link></>}
         </div>
       </div>
-      {!loading&&<div className="container gura-live-counts" aria-label="Live marketplace overview">
+      {!loading&&(productsReady||businessesReady)&&<div className="container gura-live-counts" aria-label="Live marketplace overview">
         <span><strong>{products.length}</strong> listed products</span>
         <span><strong>{businesses.length}</strong> listed businesses</span>
         <span><strong>{businesses.filter(b=>b.verified&&b.moderationStatus==="approved").length}</strong> verified businesses</span>
       </div>}
     </section>
     <section className="gura-tech-content">
-      {error&&<div className="container"><p className="gura-live-error" role="alert">{error}</p></div>}
+      {error&&<div className="container"><div className="gura-live-error" role="alert"><p>{error}</p><button type="button" className="button small" disabled={loading} onClick={()=>setRetryCount(n=>n+1)}><RotateCcw size={16}/> Retry loading</button></div></div>}
       <div className="container gura-tech-section">
         <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">PRODUCTS FROM GURA SELLERS</span><h2>Latest products</h2><p>Photos, prices and stock are taken directly from provider listings.</p></div><Link to="/shop">All products <ArrowRight size={17}/></Link></div>
         {loading?<p className="gura-live-loading">Loading products...</p>:featured.length?<div className="gura-live-product-grid">
@@ -129,7 +144,7 @@ function FreshHome() {
               <Link className="gura-live-view" to={"/shop/product/"+product.id}>View details <ArrowRight size={15}/></Link>
             </div>
           </article>)}
-        </div>:<div className="gura-live-empty"><Store size={30}/><h3>No products have been published yet</h3><p>New products uploaded by real shops and technicians will appear here automatically.</p><Link to="/directory">Browse business listings <ArrowRight size={15}/></Link></div>}
+        </div>:!productsReady?<p className="gura-live-loading">Products are temporarily unavailable. Please retry loading.</p>:<div className="gura-live-empty"><Store size={30}/><h3>No products have been published yet</h3><p>New products uploaded by real shops and technicians will appear here automatically.</p><Link to="/directory">Browse business listings <ArrowRight size={15}/></Link></div>}
       </div>
       {!!categories.length&&<section className="container gura-tech-section gura-live-category-section">
         <div className="gura-tech-section-heading"><div><span className="gura-tech-overline">BASED ON LISTED INVENTORY</span><h2>Shop by category</h2></div></div>
