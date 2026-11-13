@@ -73,16 +73,26 @@ const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attemp
 app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, response) => {
   const input = registerSchema.parse(request.body);
   const passwordHash = await hashPassword(input.password);
-  await withAuditTransaction(async client=>{
-    const result = await client.query<AuthUser>(
-      `INSERT INTO users (name, email, password_hash, role)
-       VALUES ($1, lower($2), $3, $4)
-       RETURNING id, name, email, role, location, bio, verified, suspended`,
-      [input.name, input.email, passwordHash, input.role],
-    );
-    await appendAudit(client,{actorId:result.rows[0].id,action:"user.registered",
-      subjectType:"user",subjectId:result.rows[0].id,detail:{role:input.role}});
-  });
+  try {
+    await withAuditTransaction(async client=>{
+      const result = await client.query<AuthUser>(
+        `INSERT INTO users (name, email, password_hash, role)
+         VALUES ($1, lower($2), $3, $4)
+         RETURNING id, name, email, role, location, bio, verified, suspended`,
+        [input.name, input.email, passwordHash, input.role],
+      );
+      await appendAudit(client,{actorId:result.rows[0].id,action:"user.registered",
+        subjectType:"user",subjectId:result.rows[0].id,detail:{role:input.role}});
+    });
+  } catch (error) {
+    // A repeated email is a user-facing conflict, not a server failure.
+    // Do not disclose SQL details or internal exception information.
+    if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+      response.status(409).json({ error: "An account with this email already exists. Please sign in." });
+      return;
+    }
+    throw error;
+  }
   // Account creation does not authenticate the user. Sign-in is required.
   response.status(201).json({ message: "Account created successfully. Please sign in." });
 }));
