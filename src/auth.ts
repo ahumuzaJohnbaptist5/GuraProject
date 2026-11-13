@@ -1,3 +1,4 @@
+import { fetchMarketplaceGet } from "./marketplaceFetch";
 import type { AuthAdapter, Credentials, User } from "./types";
 
 const USERS_KEY = "gura-users";
@@ -20,6 +21,8 @@ const saveSessionUser = (user: User | null) => {
   else localStorage.removeItem(SESSION_KEY);
 };
 const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+  if((init?.method||"GET").toUpperCase()==="GET")
+    return fetchMarketplaceGet<T>(`${API_URL}${path}`);
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     credentials: "include",
