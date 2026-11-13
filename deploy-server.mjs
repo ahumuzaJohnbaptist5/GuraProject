@@ -48,7 +48,7 @@ const catalogPaths = new Map([
 ]);
 const catalogCache = new Map();
 const catalogInflight = new Map();
-const FRESH_MS = 20_000;
+const FRESH_MS = process.env.NODE_ENV === "test" ? 80 : 20_000;
 const STALE_MS = 5 * 60_000;
 
 const sendCatalog = (response, data, cacheState) => {
