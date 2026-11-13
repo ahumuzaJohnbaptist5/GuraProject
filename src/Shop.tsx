@@ -16,7 +16,11 @@ const KEY="gura-marketplace-cart";
 const API_URL=import.meta.env.PROD?"":((import.meta.env.VITE_API_URL as string|undefined)?.trim() || "http://localhost:8787").replace(/\/+$/,"");
 const money=(n:number)=>"UGX "+n.toLocaleString("en-UG");
 const getCart=():CartEntry[]=>{try{const data=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(data)?data.filter((x:CartEntry)=>typeof x.productId==="string"&&Number.isInteger(x.quantity)&&x.quantity>0):[];}catch{return []}};
-const storeCart=(items:CartEntry[])=>{localStorage.setItem(KEY,JSON.stringify(items));window.dispatchEvent(new Event("gura-cart-updated"));};
+const storeCart=(items:CartEntry[])=>{
+  try { localStorage.setItem(KEY,JSON.stringify(items)); }
+  catch { throw new Error("Your browser could not save the cart. Please check site storage settings and try again."); }
+  window.dispatchEvent(new Event("gura-cart-updated"));
+};
 const request=async<T,>(path:string,init?:RequestInit):Promise<T>=>{
   const response=await fetch(API_URL+"/api/commerce"+path,{...init,credentials:"include",headers:{"Content-Type":"application/json",...(init?.headers||{})}});
   const data=await response.json().catch(()=>({}));
@@ -58,12 +62,14 @@ export function ShopPage(){
   useEffect(()=>{setQuery(params.get("q")||"");setCategory(params.get("category")||"All")},[params]);
   const [providers,setProviders]=useState<ProviderListing[]>([]);
   const [providersError,setProvidersError]=useState("");
-  const [cartNotice,setCartNotice]=useState("");
-  const [cartError,setCartError]=useState("");
+  const [cartFeedback,setCartFeedback]=useState<{productId:string;message:string;success:boolean}|null>(null);
   const addShopProduct=(product:ShopProduct)=>{
-    setCartNotice("");setCartError("");
-    try{addToCart(product);setCartNotice(`${product.name} added to cart.`)}
-    catch(error){setCartError(error instanceof Error?error.message:"Unable to add this item to your cart.")}
+    try {
+      addToCart(product);
+      setCartFeedback({productId:product.id,message:"Added to cart successfully.",success:true});
+    } catch(error) {
+      setCartFeedback({productId:product.id,message:error instanceof Error?error.message:"Unable to add this item to your cart.",success:false});
+    }
   };
   const [providersLoaded,setProvidersLoaded]=useState(false);
   const [providersRetry,setProvidersRetry]=useState(0);
@@ -79,8 +85,8 @@ export function ShopPage(){
   const shown=products.filter(p=>!p.isDemo && (category==="All"||p.category===category)&&(p.name+" "+p.description+" "+p.compatibility).toLowerCase().includes(query.toLowerCase()));
   return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">GURA marketplace</p><h1>Electronic devices & spare parts</h1><p>Browse component details, compare specifications and see listed quantities.</p></div><Link className="gura-shop-cart-link" to="/cart"><ShoppingCart size={20}/> View cart</Link></header>
     <div className="gura-shop-filters"><input aria-label="Search products" placeholder="Find a battery, screen, memory, storage..." value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Product category" value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
-    {loading&&<p>Loading marketplace catalog...</p>}{error&&<div className="gura-shop-error" role="alert">{error} <button type="button" onClick={retryLoad}><RefreshCcw size={15}/> Retry products</button></div>}{cartError&&<p className="gura-shop-error" role="alert">{cartError}</p>}{cartNotice&&<p role="status" className="gura-shop-warning">{cartNotice} <Link to="/cart">View cart</Link></p>}
-    <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={p.name} loading="lazy"/></Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>{p.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified seller</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p><p>Available units: {p.availableUnits}</p><div className="gura-marketplace-buy-actions"><button type="button" className="gura-shop-primary" disabled={p.isDemo||p.availableUnits<=0} onClick={()=>addShopProduct(p)}><ShoppingCart size={17}/> {p.isDemo?"Sample only":p.availableUnits>0?"Add to cart":"Out of stock"}</button><Link className="gura-shop-action" to={"/shop/product/"+p.id}>View full details <ArrowRight size={16}/></Link></div></div></article>)}</div>
+    {loading&&<p>Loading marketplace catalog...</p>}{error&&<div className="gura-shop-error" role="alert">{error} <button type="button" onClick={retryLoad}><RefreshCcw size={15}/> Retry products</button></div>}
+    <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={p.name} loading="lazy"/></Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>{p.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified seller</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p><p>Available units: {p.availableUnits}</p><div className="gura-marketplace-buy-actions"><button type="button" className="gura-shop-primary" disabled={p.isDemo||p.availableUnits<=0} onClick={()=>addShopProduct(p)}>{cartFeedback?.productId===p.id&&cartFeedback.success?<CheckCircle2 size={17}/>:<ShoppingCart size={17}/>} {p.isDemo?"Sample only":p.availableUnits<=0?"Out of stock":cartFeedback?.productId===p.id&&cartFeedback.success?"Added to cart":"Add to cart"}</button><Link className="gura-shop-action" to={"/shop/product/"+p.id}>View full details <ArrowRight size={16}/></Link></div>{cartFeedback?.productId===p.id&&<p role={cartFeedback.success?"status":"alert"} aria-live="polite" className={cartFeedback.success?"gura-shop-warning":"gura-shop-error"}>{cartFeedback.message} {cartFeedback.success&&<Link to="/cart">View cart <ArrowRight size={15}/></Link>}</p>}</div></article>)}</div>
     {!loading&&loaded&&!error&&!shown.length&&<div className="gura-shop-empty"><Package size={32}/><h2>No stocked products available yet</h2><p>Browse local suppliers and technician listings below to inquire about electronics and spare parts.</p><Link className="gura-shop-primary" to="/directory">Find local suppliers <ArrowRight size={16}/></Link></div>}
 
     <section className="gura-shop-provider-section" aria-labelledby="gura-provider-heading"><h2 id="gura-provider-heading">Local shops & technicians</h2>
