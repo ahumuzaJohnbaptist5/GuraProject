@@ -19,6 +19,8 @@ jobs:
         run: npm ci
       - name: Compile and bundle
         run: npm run build
+      - name: Gate proxy catalogue recovery and auth/logout session forwarding
+        run: node scripts/proxy-release-smoke.mjs
       - name: Verify marketplace proxy cache and session isolation
         run: node tests/catalog-proxy.test.mjs
 
