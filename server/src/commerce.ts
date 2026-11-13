@@ -153,7 +153,7 @@ commerceRouter.patch("/my-products/:id",protect,asyncRoute(async (req,res)=>{
 commerceRouter.get("/orders", protect, asyncRoute(async (_req, res) => {
   const user = res.locals.user as AuthUser;
   const result = await query(
-    'SELECT id, status, payment_method AS "paymentMethod", phone_number AS "phoneNumber", amount_ugx AS "amountUgx", created_at AS "createdAt", paid_at AS "paidAt" FROM marketplace_orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 50',
+    'SELECT id, status, payment_method AS "paymentMethod", phone_number AS "phoneNumber", amount_ugx AS "amountUgx", (payment_tracking_id IS NOT NULL) AS "paymentInitiated", created_at AS "createdAt", paid_at AS "paidAt" FROM marketplace_orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 50',
     [user.id],
   );
   const ids = result.rows.map(item => item.id);
