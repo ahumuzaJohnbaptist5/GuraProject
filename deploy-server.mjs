@@ -40,9 +40,97 @@ const serve = async (request, response) => {
 
 // Keep API requests same-origin so browsers send session cookies reliably.
 const apiOrigin = new URL(process.env.API_PROXY_TARGET || "https://gura-api-272p.onrender.com");
+// Only public, identical-for-everyone catalogue responses may be shared.
+// Never cache identity, admin, checkout, payment or other user-specific APIs.
+const catalogPaths = new Map([
+  ["/api/commerce/products", "products"],
+  ["/api/listings", "listings"],
+]);
+const catalogCache = new Map();
+const catalogInflight = new Map();
+const FRESH_MS = 20_000;
+const STALE_MS = 5 * 60_000;
+
+const sendCatalog = (response, data, cacheState) => {
+  response.writeHead(200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Gura-Catalog-Cache": cacheState,
+  });
+  response.end(data);
+};
+const publicCatalog = async (path, response) => {
+  const existing = catalogCache.get(path);
+  if (existing && Date.now() - existing.at < FRESH_MS) {
+    sendCatalog(response, existing.body, "fresh");
+    return;
+  }
+  let pending = catalogInflight.get(path);
+  if (!pending) {
+    pending = (async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      try {
+        const upstream = await fetch(new URL(path, apiOrigin), {
+          headers: { Accept: "application/json" },
+          redirect: "manual",
+          signal: controller.signal,
+        });
+        const body = Buffer.from(await upstream.arrayBuffer());
+        const contentType = upstream.headers.get("content-type") || "";
+        if (upstream.ok && contentType.includes("application/json")) {
+          // Cache only a response that matches this public endpoint's schema.
+          let parsed;
+          try { parsed = JSON.parse(body.toString("utf8")); } catch { parsed = null; }
+          if (parsed && Array.isArray(parsed[catalogPaths.get(path)])) {
+            catalogCache.set(path, { body, at: Date.now() });
+            return { body, cacheState: "refreshed" };
+          }
+        }
+        console.warn("GURA public catalog refresh failed", path, "HTTP", upstream.status);
+        return { failureStatus: upstream.status, retryAfter: upstream.headers.get("retry-after") };
+      } finally {
+        clearTimeout(timeout);
+      }
+    })().finally(() => catalogInflight.delete(path));
+    catalogInflight.set(path, pending);
+  }
+  try {
+    const result = await pending;
+    if (result.body) {
+      sendCatalog(response, result.body, result.cacheState);
+    } else {
+      const fallback = catalogCache.get(path);
+      if (fallback && Date.now() - fallback.at < STALE_MS) {
+        sendCatalog(response, fallback.body, "stale");
+      } else {
+        const status = result.failureStatus === 429 ? 429 : 503;
+        const retryAfter = result.retryAfter ? { "Retry-After": result.retryAfter } : {};
+        response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", ...retryAfter });
+        response.end(JSON.stringify({ error: status === 429
+          ? "Marketplace is being rate limited. Please retry shortly."
+          : "Marketplace data is temporarily unavailable. Please retry." }));
+      }
+    }
+  } catch (error) {
+    console.error("GURA public catalog proxy error", path, error);
+    const fallback = catalogCache.get(path);
+    if (fallback && Date.now() - fallback.at < STALE_MS) {
+      sendCatalog(response, fallback.body, "stale");
+    } else {
+      response.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ error: "Marketplace data is temporarily unavailable. Please retry." }));
+    }
+  }
+};
 const proxyApi = async (request, response) => {
   const url = new URL(request.url || "/", "http://localhost");
   if (!url.pathname.startsWith("/api/")) { response.writeHead(404); response.end(); return; }
+  if (request.method === "GET" && !url.search && catalogPaths.has(url.pathname)) {
+    await publicCatalog(url.pathname, response);
+    return;
+  }
   const headers = {
     Accept: request.headers.accept || "application/json",
     "Content-Type": request.headers["content-type"] || "application/json",
