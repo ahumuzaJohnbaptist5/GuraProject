@@ -67,7 +67,10 @@ const checkPesapalNotification = async (token: string, ipnId: string) => {
     signal: AbortSignal.timeout(5_000),
   });
   const registrations: unknown = await response.json().catch(() => null);
-  if (!response.ok || !Array.isArray(registrations)) throw new PaymentGatewayError("IPN_CHECK_UNAVAILABLE");
+  if (!response.ok || !Array.isArray(registrations)) {
+    console.error("Pesapal notification verification unavailable", {status:response.status});
+    throw new PaymentGatewayError("IPN_CHECK_UNAVAILABLE");
+  }
   return registrations.some(row => row && typeof row === "object" &&
     typeof row.ipn_id === "string" && row.ipn_id.toLowerCase() === ipnId.toLowerCase() && !row.error);
 };
