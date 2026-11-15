@@ -21,28 +21,55 @@ const protect = async (req: Request, res: Response, next: NextFunction) => {
 const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
 const pesapalBase = process.env.PESAPAL_ENV === "live" ? "https://pay.pesapal.com/v3/api" : "https://cybqa.pesapal.com/pesapalv3/api";
 const pesapalEnabled = Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET && process.env.PESAPAL_IPN_ID);
+class PaymentGatewayError extends Error {
+  constructor(readonly providerCode: string) {
+    super("Payment gateway could not process the request.");
+  }
+}
 const moneyRequest = async (path: string, init?: RequestInit) => {
-  // Never log the request body, authorization headers, bearer token, or the
-  // complete provider response: any of those may contain payment secrets.
-  const operation = path === "/Auth/RequestToken" ? "authentication"
-    : path === "/Transactions/SubmitOrderRequest" ? "submit_order"
-    : path === "/Transactions/GetTransactionStatus" ? "verify_payment"
+  // Log only fixed categories and provider codes, never raw provider messages,
+  // tokens, personal data, request bodies or authorization headers.
+  const operation = path.split("?")[0] === "/Auth/RequestToken" ? "authentication"
+    : path.split("?")[0] === "/Transactions/SubmitOrderRequest" ? "submit_order"
+    : path.split("?")[0] === "/Transactions/GetTransactionStatus" ? "verify_payment"
     : "other";
   const response = await fetch(pesapalBase + path, { ...init, signal: AbortSignal.timeout(15_000), headers: { Accept: "application/json", "Content-Type": "application/json", ...(init?.headers ?? {}) } });
   const body = await response.json().catch(() => null) as Record<string, unknown> | null;
-  if (!response.ok || !body || (body.error && typeof body.error === "object")) {
-    const errorObject = body?.error && typeof body.error === "object"
-      ? body.error as Record<string, unknown> : null;
-    const rawCode = errorObject?.code ?? body?.error_code;
+  const errorObject = body?.error && typeof body.error === "object"
+    ? body.error as Record<string, unknown> : null;
+  const rawCode = errorObject?.code ?? body?.error_code;
+  const message = typeof errorObject?.message === "string" ? errorObject.message : "";
+  const hasError = Boolean(rawCode || message || errorObject?.type || errorObject?.error_type
+    || (body?.error && typeof body.error !== "object"));
+  if (!response.ok || !body || Array.isArray(body) || hasError) {
     const providerCode = typeof rawCode === "string" && /^[a-zA-Z0-9_.-]{1,64}$/.test(rawCode)
       ? rawCode : "unavailable";
+    const reason = /notification|\bipn\b/i.test(message) ? "notification_id"
+      : /phone|mobile number/i.test(message) ? "phone_number"
+      : /email/i.test(message) ? "email_address"
+      : /callback/i.test(message) ? "callback_url"
+      : /currency/i.test(message) ? "currency"
+      : /amount/i.test(message) ? "amount"
+      : /reference|duplicate/i.test(message) ? "merchant_reference"
+      : /billing|address/i.test(message) ? "billing_address" : "unspecified";
     console.error("Pesapal API rejected request", {
       operation, environment: process.env.PESAPAL_ENV === "live" ? "live" : "sandbox",
-      status: response.status, providerCode,
+      status: response.status, providerCode, reason,
     });
-    throw new Error("Payment service request failed. Please retry later.");
+    throw new PaymentGatewayError(providerCode);
   }
   return body;
+};
+const checkPesapalNotification = async (token: string, ipnId: string) => {
+  // The list endpoint is read-only and scoped to this merchant/environment.
+  const response = await fetch(pesapalBase + "/URLSetup/GetIpnList", {
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: "Bearer " + token },
+    signal: AbortSignal.timeout(5_000),
+  });
+  const registrations: unknown = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(registrations)) throw new PaymentGatewayError("IPN_CHECK_UNAVAILABLE");
+  return registrations.some(row => row && typeof row === "object" &&
+    typeof row.ipn_id === "string" && row.ipn_id.toLowerCase() === ipnId.toLowerCase() && !row.error);
 };
 const pesapalToken = async () => {
   const result = await moneyRequest("/Auth/RequestToken", {
@@ -243,18 +270,43 @@ commerceRouter.post("/orders/:id/pay", protect, asyncRoute(async (req,res) => {
   if (item.status !== "pending_payment") { res.status(409).json({error:"This order cannot be paid in its current status."}); return; }
   if (!pesapalEnabled) { res.status(503).json({error:"Secure payment processing has not been activated. Your order remains unpaid."}); return; }
   if (item.payment_tracking_id) { res.status(409).json({error:"Payment was already initiated. Check order status instead."}); return; }
-  const token = await pesapalToken();
-  const result = await moneyRequest("/Transactions/SubmitOrderRequest", {
-    method:"POST",
-    headers:{Authorization:"Bearer "+token},
-    body:JSON.stringify({
-      id:item.id,amount:item.amount_ugx,currency:"UGX",
-      description:"GURA order "+item.id.slice(0,8),
-      callback_url:config.webOrigin+"/orders?returned=1",
-      notification_id:process.env.PESAPAL_IPN_ID,
-      billing_address:{email_address:user.email,phone_number:item.phone_number || undefined,first_name:user.name.split(" ")[0],last_name:user.name.split(" ").slice(1).join(" "),country_code:"UG"},
-    }),
-  });
+  const ipnId = (process.env.PESAPAL_IPN_ID || "").trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ipnId)) {
+    console.error("Pesapal configuration invalid: notification ID is not a GUID");
+    res.status(503).json({error:"Payment configuration needs attention. Your order remains pending."}); return;
+  }
+  const amount = Number(item.amount_ugx);
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    res.status(409).json({error:"This order has an invalid payment amount. Contact support."}); return;
+  }
+  const phone = item.phone_number?.trim().replace(/^0(?=7)/, "+256").replace(/^256(?=7)/, "+256");
+  if (phone && !/^\+2567[0-9]{8}$/.test(phone)) {
+    res.status(400).json({error:"The order has an invalid mobile number. Contact support before retrying."}); return;
+  }
+  const names = user.name.trim().split(/\s+/).filter(Boolean);
+  let result: Record<string, unknown>;
+  try {
+    const token = await pesapalToken();
+    if (!await checkPesapalNotification(token, ipnId)) {
+      console.error("Pesapal configuration invalid: notification ID not registered to configured merchant");
+      res.status(503).json({error:"Payment notification configuration needs attention. Your order remains pending."}); return;
+    }
+    result = await moneyRequest("/Transactions/SubmitOrderRequest", {
+      method:"POST",
+      headers:{Authorization:"Bearer "+token},
+      body:JSON.stringify({
+        id:item.id,amount,currency:"UGX",
+        description:"GURA order "+item.id.slice(0,8),
+        callback_url:config.webOrigin+"/orders?returned=1",
+        notification_id:ipnId,
+        billing_address:{email_address:user.email.trim(),phone_number:phone || undefined,
+          first_name:names[0] || undefined,last_name:names.slice(1).join(" ") || undefined,country_code:"UG"},
+      }),
+    });
+  } catch (error) {
+    if (!(error instanceof PaymentGatewayError)) console.error("Pesapal payment initiation unavailable");
+    res.status(502).json({error:"Payment gateway could not start checkout. Your order remains pending. Check its status before retrying."}); return;
+  }
   if(typeof result.order_tracking_id !== "string" || typeof result.redirect_url !== "string") throw new Error("Payment gateway did not provide a checkout link.");
   const trackingId: string = result.order_tracking_id;
   const url = new URL(result.redirect_url);
