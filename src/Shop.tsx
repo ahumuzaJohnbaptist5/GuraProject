@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle2, Minus, Plus, ShoppingCart, Package, ShieldCheck, Store, Wrench, X, RefreshCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Minus, Plus, ShoppingCart, Package, ShieldCheck, Store, Wrench, X, RefreshCcw } from "lucide-react";
 import type { User } from "./types";
+import { hydrateDomain } from "./data";
 import { prepareListingPhotos } from "./listingPhotos";
 import { fetchMarketplaceGet } from "./marketplaceFetch";
 
 export type ShopProduct = {
   id:string; sku:string; name:string; description:string; category:string; priceUgx:number; availableUnits:number;
-  imageUrl:string; imageUrls?:string[]; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean; sellerVerified?:boolean; businessName?:string; businessPhone?:string; businessWhatsapp?:string; businessEmail?:string;
+  imageUrl:string; imageUrls?:string[]; condition:string; compatibility:string; specifications:Record<string,string>; isDemo:boolean; sellerVerified?:boolean; businessName?:string; businessListingId?:string; businessLocation?:string; businessPhone?:string; businessWhatsapp?:string; businessEmail?:string;
 };
 type ProviderListing={id:string;name:string;type:"shop"|"technician"|"seller";location:string;text:string;images?:string[];verified:boolean;moderationStatus:"pending"|"approved"|"rejected";businessPhone?:string;businessWhatsapp?:string;businessEmail?:string};
 type CartEntry={productId:string;quantity:number};
@@ -48,29 +49,31 @@ const useProducts=()=>{
   },[retry]);
   return {products,loading,error,loaded,retryLoad:()=>setRetry(n=>n+1)};
 };
-const addToCart=(product:ShopProduct,quantity=1)=>{
-  if(product.isDemo)throw new Error("This item is not available for purchase.");
-  const cart=getCart();const existing=cart.find(x=>x.productId===product.id);
-  const current=existing?.quantity||0;
-  if(product.availableUnits<=0)throw new Error("This item is out of stock.");
-  if(current+quantity>product.availableUnits || current+quantity>20)throw new Error("Maximum 20 units per product, subject to available stock.");
-  const next=existing?cart.map(x=>x.productId===product.id?{...x,quantity:x.quantity+quantity}:x):[...cart,{productId:product.id,quantity}];
-  storeCart(next);
-};
+function SellerContact({product}:{product:ShopProduct}){
+  const phone=(product.businessPhone||"").replace(/[^\d+]/g,"");
+  const whatsapp=(product.businessWhatsapp||"").replace(/\D/g,"").replace(/^0/,"256");
+  const message=encodeURIComponent("Hello, I found "+product.name+" on GURA. Is it still available?");
+  return <div className="gura-marketplace-contacts"><strong>{product.businessName||"Seller"}</strong>{product.businessLocation&&<p>Address: {product.businessLocation}</p>}{phone&&<a href={"tel:"+phone}>Call {product.businessPhone}</a>}{whatsapp&&<a href={"https://wa.me/"+whatsapp+"?text="+message} target="_blank" rel="noopener noreferrer">WhatsApp seller</a>}{product.businessEmail&&<a href={"mailto:"+product.businessEmail+"?subject="+encodeURIComponent("GURA inquiry: "+product.name)}>Email seller</a>}{!phone&&!whatsapp&&!product.businessEmail&&<small>Seller has not published direct contact information yet.</small>}</div>;
+}
+function ProductInquiry({product,user}:{product:ShopProduct;user:User|null}){
+  const [busy,setBusy]=useState(false);const [sent,setSent]=useState(false);const [error,setError]=useState("");
+  if(!product.businessListingId)return null;
+  const send=async()=>{
+    if(busy||sent)return;setBusy(true);setError("");
+    try{
+      const response=await fetch(API_URL+"/api/requests",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({listingId:product.businessListingId,productId:product.id,title:("Product inquiry: "+product.name).slice(0,160),details:"Interested in "+product.name+". Please confirm availability and collection arrangements."})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||"Unable to send inquiry.");
+      setSent(true);void hydrateDomain().catch(()=>{});
+    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to send inquiry.");}finally{setBusy(false);}
+  };
+  return <div className="gura-product-actions">{user?<button className="gura-shop-primary" type="button" onClick={()=>void send()} disabled={busy||sent}>{sent?"Inquiry sent":busy?"Sending...":"Send product inquiry"}</button>:<Link className="gura-shop-primary" to="/login">Sign in to send an inquiry</Link>}{sent&&<Link to="/dashboard">Track inquiry in dashboard</Link>}{error&&<p role="alert">{error}</p>}</div>;
+}
 export function ShopPage(){
   const {products,loading,error,loaded,retryLoad}=useProducts();const [params]=useSearchParams();const [query,setQuery]=useState(()=>params.get("q")||"");const [category,setCategory]=useState(()=>params.get("category")||"All");
   useEffect(()=>{setQuery(params.get("q")||"");setCategory(params.get("category")||"All")},[params]);
   const [providers,setProviders]=useState<ProviderListing[]>([]);
   const [providersError,setProvidersError]=useState("");
-  const [cartFeedback,setCartFeedback]=useState<{productId:string;message:string;success:boolean}|null>(null);
-  const addShopProduct=(product:ShopProduct)=>{
-    try {
-      addToCart(product);
-      setCartFeedback({productId:product.id,message:"Added to cart successfully.",success:true});
-    } catch(error) {
-      setCartFeedback({productId:product.id,message:error instanceof Error?error.message:"Unable to add this item to your cart.",success:false});
-    }
-  };
   const [providersLoaded,setProvidersLoaded]=useState(false);
   const [providersRetry,setProvidersRetry]=useState(0);
   useEffect(()=>{
@@ -83,10 +86,10 @@ export function ShopPage(){
   },[providersRetry]);
   const categories=["All",...new Set(products.map(x=>x.category))];
   const shown=products.filter(p=>!p.isDemo && (category==="All"||p.category===category)&&(p.name+" "+p.description+" "+p.compatibility).toLowerCase().includes(query.toLowerCase()));
-  return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">GURA marketplace</p><h1>Electronic devices & spare parts</h1><p>Browse component details, compare specifications and see listed quantities.</p></div><Link className="gura-shop-cart-link" to="/cart"><ShoppingCart size={20}/> View cart</Link></header>
+  return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">GURA marketplace</p><h1>Electronic devices & spare parts</h1><p>Browse component details, compare specifications and see listed quantities.</p></div><Link className="gura-shop-cart-link" to="/directory">Find sellers</Link></header>
     <div className="gura-shop-filters"><input aria-label="Search products" placeholder="Find a battery, screen, memory, storage..." value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Product category" value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
     {loading&&<p>Loading marketplace catalog...</p>}{error&&<div className="gura-shop-error" role="alert">{error} <button type="button" onClick={retryLoad}><RefreshCcw size={15}/> Retry products</button></div>}
-    <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={p.name} loading="lazy"/></Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>{p.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified seller</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p><p>Available units: {p.availableUnits}</p><div className="gura-marketplace-buy-actions"><button type="button" className="gura-shop-primary" disabled={p.isDemo||p.availableUnits<=0} onClick={()=>addShopProduct(p)}>{cartFeedback?.productId===p.id&&cartFeedback.success?<CheckCircle2 size={17}/>:<ShoppingCart size={17}/>} {p.isDemo?"Sample only":p.availableUnits<=0?"Out of stock":cartFeedback?.productId===p.id&&cartFeedback.success?"Added to cart":"Add to cart"}</button><Link className="gura-shop-action" to={"/shop/product/"+p.id}>View full details <ArrowRight size={16}/></Link></div>{cartFeedback?.productId===p.id&&<p role={cartFeedback.success?"status":"alert"} aria-live="polite" className={cartFeedback.success?"gura-shop-warning":"gura-shop-error"}>{cartFeedback.message} {cartFeedback.success&&<Link to="/cart">View cart <ArrowRight size={15}/></Link>}</p>}</div></article>)}</div>
+    <div className="gura-shop-grid">{shown.map(p=><article className="gura-shop-card" key={p.id}><Link to={"/shop/product/"+p.id} className="gura-shop-photo"><img src={p.imageUrl} alt={p.name} loading="lazy"/></Link><div className="gura-shop-card-content"><small>{p.category} · {p.condition}</small><Link to={"/shop/product/"+p.id}><h2>{p.name}</h2></Link><strong>{money(p.priceUgx)}</strong><p>{p.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified seller</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p><p>Available units: {p.availableUnits}</p><SellerContact product={p}/><Link className="gura-shop-action" to={"/shop/product/"+p.id}>Contact seller & view details <ArrowRight size={16}/></Link></div></article>)}</div>
     {!loading&&loaded&&!error&&!shown.length&&<div className="gura-shop-empty"><Package size={32}/><h2>No stocked products available yet</h2><p>Browse local suppliers and technician listings below to inquire about electronics and spare parts.</p><Link className="gura-shop-primary" to="/directory">Find local suppliers <ArrowRight size={16}/></Link></div>}
 
     <section className="gura-shop-provider-section" aria-labelledby="gura-provider-heading"><h2 id="gura-provider-heading">Local shops & technicians</h2>
@@ -100,8 +103,8 @@ export function ShopPage(){
     </section>
   </main>;
 }
-export function ProductPage(){
-  const {id}=useParams();const navigate=useNavigate();const [product,setProduct]=useState<ShopProduct|null>(null);const [retryProduct,setRetryProduct]=useState(0);const [activePhoto,setActivePhoto]=useState(0);const [quantity,setQuantity]=useState(1);const [error,setError]=useState("");const [loading,setLoading]=useState(true);
+export function ProductPage({user}:{user:User|null}){
+  const {id}=useParams();const [product,setProduct]=useState<ShopProduct|null>(null);const [retryProduct,setRetryProduct]=useState(0);const [activePhoto,setActivePhoto]=useState(0);const [error,setError]=useState("");const [loading,setLoading]=useState(true);
   useEffect(()=>{
     if(!id)return;
     const controller=new AbortController();
@@ -112,10 +115,8 @@ export function ProductPage(){
       .finally(()=>{if(!controller.signal.aborted)setLoading(false)});
     return()=>controller.abort();
   },[id,retryProduct]);
-  const add=()=>{if(!product)return;setError("");try{addToCart(product,quantity);navigate("/cart")}catch(e){setError(e instanceof Error?e.message:"Cannot add to cart.")}};
-  const notPurchasable=!!product&&(product.isDemo||product.availableUnits<=0);
   return <main className="container gura-shop-page"><Link className="gura-shop-back" to="/shop"><ArrowLeft size={16}/> All products</Link>{loading&&<p>Loading product information...</p>}{error&&<div className="gura-shop-error" role="alert">{error} <button type="button" onClick={()=>setRetryProduct(n=>n+1)}><RefreshCcw size={15}/> Retry product</button></div>}
-    {product&&<div className="gura-product-layout"><div className="gura-product-gallery"><div className="gura-product-hero-image"><img src={(product.imageUrls?.length?product.imageUrls:[product.imageUrl])[activePhoto]||product.imageUrl} alt={`${product.name} — photo ${activePhoto+1}`}/></div><div className="gura-product-thumbnails">{(product.imageUrls?.length?product.imageUrls:[product.imageUrl]).map((src,index)=><button type="button" className={activePhoto===index?"selected":""} key={index} onClick={()=>setActivePhoto(index)} aria-label={`View product photo ${index+1}`} aria-pressed={activePhoto===index}><img src={src} alt={`Thumbnail ${index+1}`}/></button>)}</div></div><div className="gura-product-information"><span className="gura-shop-category">{product.category} · {product.condition}</span><h1>{product.name}</h1><p>{product.description}</p><strong className="gura-product-price">{money(product.priceUgx)}</strong><p>{product.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified supplier</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p>{product.businessName&&<p>Seller: <b>{product.businessName}</b></p>}{(product.businessPhone||product.businessWhatsapp||product.businessEmail)&&<div className="gura-marketplace-contacts"><strong>Seller contacts</strong>{product.businessPhone&&<a href={"tel:"+product.businessPhone.replace(/[^\d+]/g,"")}>Call {product.businessPhone}</a>}{product.businessWhatsapp&&<a href={"https://wa.me/"+product.businessWhatsapp.replace(/\D/g,"").replace(/^0/,"256")} target="_blank" rel="noopener noreferrer">WhatsApp</a>}{product.businessEmail&&<a href={"mailto:"+product.businessEmail}>Email supplier</a>}</div>}<p className="gura-product-stock">Available stock: <b>{product.availableUnits} units</b></p><p><b>Compatibility:</b> {product.compatibility}</p><h2>Full specifications</h2><dl className="gura-specs">{Object.entries(product.specifications).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}<div><dt>SKU</dt><dd>{product.sku}</dd></div><div><dt>Condition</dt><dd>{product.condition}</dd></div></dl><div className="gura-product-actions"><div className="gura-quantity"><button type="button" disabled={notPurchasable||quantity<=1} onClick={()=>setQuantity(q=>Math.max(1,q-1))} aria-label="Decrease quantity"><Minus size={16}/></button><span>{quantity}</span><button type="button" disabled={notPurchasable||quantity>=Math.min(20,product.availableUnits)} onClick={()=>setQuantity(q=>Math.min(Math.min(20,product.availableUnits),q+1))} aria-label="Increase quantity"><Plus size={16}/></button></div><button className="gura-shop-primary" onClick={add} disabled={notPurchasable}><ShoppingCart size={18}/> {product.isDemo?"Sample only":product.availableUnits>0?"Add to cart":"Out of stock"}</button></div>{notPurchasable&&<p className="gura-shop-warning" role="status">{product.isDemo?"This is a demonstration item and cannot be purchased.":`This item currently has ${product.availableUnits} units recorded in inventory. The seller must update stock before orders can be placed.`} {product.businessPhone&&<a href={"tel:"+product.businessPhone.replace(/[^\d+]/g,"")}>Contact seller</a>}</p>}</div></div>}
+    {product&&<div className="gura-product-layout"><div className="gura-product-gallery"><div className="gura-product-hero-image"><img src={(product.imageUrls?.length?product.imageUrls:[product.imageUrl])[activePhoto]||product.imageUrl} alt={`${product.name} — photo ${activePhoto+1}`}/></div><div className="gura-product-thumbnails">{(product.imageUrls?.length?product.imageUrls:[product.imageUrl]).map((src,index)=><button type="button" className={activePhoto===index?"selected":""} key={index} onClick={()=>setActivePhoto(index)} aria-label={`View product photo ${index+1}`} aria-pressed={activePhoto===index}><img src={src} alt={`Thumbnail ${index+1}`}/></button>)}</div></div><div className="gura-product-information"><span className="gura-shop-category">{product.category} · {product.condition}</span><h1>{product.name}</h1><p>{product.description}</p><strong className="gura-product-price">{money(product.priceUgx)}</strong><p>{product.sellerVerified?<span className="verified"><ShieldCheck size={14}/> Verified supplier</span>:<span className="gura-unverified"><ShieldCheck size={14}/> Not Yet Verified</span>}</p><SellerContact product={product}/><p className="gura-shop-note">Confirm availability, pickup and payment directly with the seller. GURA does not collect payments.</p><p className="gura-product-stock">Available stock: <b>{product.availableUnits} units</b></p><p><b>Compatibility:</b> {product.compatibility}</p><h2>Full specifications</h2><dl className="gura-specs">{Object.entries(product.specifications).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}<div><dt>SKU</dt><dd>{product.sku}</dd></div><div><dt>Condition</dt><dd>{product.condition}</dd></div></dl><ProductInquiry product={product} user={user}/></div></div>}
   </main>;
 }
 export function CartPage(){
@@ -199,30 +200,14 @@ export function OrdersPage({user}:{user:User|null}){
     }catch(cause){setError(cause instanceof Error?cause.message:"Could not verify payment.")}
     finally{setBusyOrder(null)}
   };
-  const resume=async(order:Order)=>{
-    if(order.status!=="pending_payment"||order.paymentInitiated)return;
-    setBusyOrder(order.id);setError("");setNotice("");
-    try{
-      // Only start payment for this existing order. No new order is created.
-      const pay=await request<{redirectUrl:string}>("/orders/"+order.id+"/pay",{method:"POST",body:"{}"});
-      window.location.assign(pay.redirectUrl);
-    }catch(cause){
-      setError("Unable to start payment for order #"+order.id.slice(0,8).toUpperCase()+": "+
-        (cause instanceof Error?cause.message:"Payment service unavailable.")+
-        " Your order remains pending. Check its status before retrying.");
-      // Refresh the server's tracking state before offering another attempt.
-      try{const latest=await request<{orders:Order[]}>("/orders");setOrders(latest.orders);}
-      catch{ /* Preserve the existing orders while showing the original error. */ }
-    }finally{setBusyOrder(null)}
-  };
-  return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">Your GURA account</p><h1>My orders</h1><p>Track checkout and payment confirmation for your GURA orders.</p></div><button className="gura-shop-cart-link" disabled={loading||!!busyOrder} onClick={()=>void load()}><RefreshCcw size={17}/> Refresh</button></header>
-    {search.has("pending")&&<div className="gura-shop-warning">Your order was saved without starting payment. Select Resume payment below when available.</div>}
-    {search.has("paymentError")&&<div className="gura-shop-warning">An order was already created. Resume payment from its existing order card rather than checking out again.</div>}
+  return <main className="container gura-shop-page"><header className="gura-shop-heading"><div><p className="eyebrow">Your GURA account</p><h1>My orders</h1><p>Historical orders are preserved. New purchases are arranged directly with sellers; online payments are paused.</p></div><button className="gura-shop-cart-link" disabled={loading||!!busyOrder} onClick={()=>void load()}><RefreshCcw size={17}/> Refresh</button></header>
+    {search.has("pending")&&<div className="gura-shop-warning">Your old order remains unpaid. Contact the seller directly to arrange a purchase.</div>}
+    {search.has("paymentError")&&<div className="gura-shop-warning">Your previous order is preserved. Online payment is paused.</div>}
     {search.has("returned")&&<div className="gura-shop-warning">Returned from Pesapal. Check payment status below; only verified payment is recorded as paid.</div>}
     {loading&&<p role="status">Loading orders...</p>}
     {error&&<p className="gura-shop-error" role="alert">{error}</p>}
     {notice&&<p className="gura-shop-warning" role="status">{notice}</p>}
-    {!user?<p><Link to="/login">Sign in</Link> to view your orders.</p>:<div className="gura-order-list">{orders.map(order=><article className="gura-order-card" key={order.id}><div className="gura-order-head"><div><strong>Order #{order.id.slice(0,8).toUpperCase()}</strong><small>{new Date(order.createdAt).toLocaleString("en-UG")}</small></div><span className={"gura-order-status "+order.status}>{order.status.replace("_"," ")}</span></div><div>{order.items.map(item=><p key={item.productId}>{item.quantity} × {item.name}<b>{money(item.priceUgx*item.quantity)}</b></p>)}</div><footer><strong>Total: {money(order.amountUgx)}</strong>{order.status==="pending_payment"&&<div className="request-actions">{order.paymentInitiated?<button type="button" onClick={()=>void verify(order.id)} disabled={loading||!!busyOrder}><RefreshCcw size={16}/> {busyOrder===order.id?"Checking...":"Check payment status"}</button>:<><button type="button" onClick={()=>void verify(order.id)} disabled={loading||!!busyOrder}><RefreshCcw size={16}/> Check status</button><button type="button" onClick={()=>void resume(order)} disabled={loading||!!busyOrder}><ArrowRight size={16}/> {busyOrder===order.id?"Connecting...":"Resume payment"}</button></>}</div>}</footer>{order.status==="pending_payment"&&order.paymentInitiated&&<small>Payment was already initiated. Check status before attempting another payment.</small>}</article>)}{!orders.length&&!loading&&<div className="gura-shop-empty"><Package size={34}/><h2>No orders yet</h2><Link className="gura-shop-primary" to="/shop">Browse products</Link></div>}</div>}
+    {!user?<p><Link to="/login">Sign in</Link> to view your orders.</p>:<div className="gura-order-list">{orders.map(order=><article className="gura-order-card" key={order.id}><div className="gura-order-head"><div><strong>Order #{order.id.slice(0,8).toUpperCase()}</strong><small>{new Date(order.createdAt).toLocaleString("en-UG")}</small></div><span className={"gura-order-status "+order.status}>{order.status.replace("_"," ")}</span></div><div>{order.items.map(item=><p key={item.productId}>{item.quantity} × {item.name}<b>{money(item.priceUgx*item.quantity)}</b></p>)}</div><footer><strong>Total: {money(order.amountUgx)}</strong>{order.status==="pending_payment"&&order.paymentInitiated&&<div className="request-actions"><button type="button" onClick={()=>void verify(order.id)} disabled={loading||!!busyOrder}><RefreshCcw size={16}/> {busyOrder===order.id?"Checking...":"Check existing payment status"}</button></div>}</footer>{order.status==="pending_payment"&&order.paymentInitiated&&<small>Payment was already initiated. Check status before attempting another payment.</small>}</article>)}{!orders.length&&!loading&&<div className="gura-shop-empty"><Package size={34}/><h2>No orders yet</h2><Link className="gura-shop-primary" to="/shop">Browse products</Link></div>}</div>}
   </main>;
 }
 
