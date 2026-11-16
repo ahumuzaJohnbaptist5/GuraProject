@@ -11,10 +11,11 @@ const hashToken = (token: string) => createHash("sha256").update(token).digest("
 export const hashPassword = (password: string) => bcrypt.hash(password, 12);
 export const verifyPassword = (password: string, hash: string) => bcrypt.compare(password, hash);
 
-export const createSession = async (userId: string, response: Response) => {
+export const createSession = async (userId: string, response: Response, expectedHash: string) => {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + config.sessionDays * 24 * 60 * 60 * 1000);
-  await query("INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)", [userId, hashToken(token), expiresAt]);
+  const inserted=await query("INSERT INTO sessions (user_id, token_hash, expires_at) SELECT id,$2,$3 FROM users WHERE id=$1 AND password_hash=$4 AND NOT suspended FOR UPDATE", [userId, hashToken(token), expiresAt,expectedHash]);
+  if(!inserted.rowCount)return false;
   response.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -22,6 +23,7 @@ export const createSession = async (userId: string, response: Response) => {
     expires: expiresAt,
     path: "/",
   });
+  return true;
 };
 
 export const destroySession = async (request: Request, response: Response) => {
