@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -6,7 +7,7 @@ import { config } from "./config.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword, type AuthUser } from "./auth.js";
 import { pool, query } from "./db.js";
 import { rateLimit, sameOrigin, securityHeaders } from "./security.js";
-import { createNotification } from "./notifications.js";
+import { createNotification, emailDeliveryConfigured, sendEmail } from "./notifications.js";
 import { commerceRouter } from "./commerce.js";
 import { appendAudit, verifyLedger, withAuditTransaction } from "./auditLedger.js";
 
@@ -70,6 +71,60 @@ app.patch("/api/notifications/read", requireUser, asyncRoute(async (request, res
 
 const authRateLimit = rateLimit(15 * 60_000, 10, "Too many authentication attempts. Please try again later.", { keyByEmail: true });
 
+
+const resetRequestLimit = rateLimit(15 * 60_000, 5, "Too many password recovery requests. Please try again later.", {keyByEmail:true});
+const resetSubmitLimit = rateLimit(15 * 60_000, 30, "Too many password reset attempts. Please try again later.");
+const resetHash = (value:string) => createHash("sha256").update(value).digest("hex");
+app.post("/api/auth/forgot-password", resetRequestLimit, asyncRoute(async (request,response)=>{
+  const {email} = z.object({email:z.string().trim().email().max(320)}).parse(request.body);
+  if (!emailDeliveryConfigured) { response.status(503).json({error:"Password recovery email is temporarily unavailable. Please contact GURA support."}); return; }
+  const token = randomBytes(32).toString("hex");
+  const result = await query<{email:string}>(`
+    WITH eligible AS (SELECT id,email FROM users WHERE email=lower($1) AND suspended=FALSE),
+    issued AS (
+      INSERT INTO password_reset_tokens(user_id,token_hash,expires_at)
+      SELECT id,$2,now()+interval '15 minutes' FROM eligible
+      ON CONFLICT(user_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,created_at=now(),expires_at=EXCLUDED.expires_at
+      WHERE password_reset_tokens.created_at < now()-interval '1 minute'
+      RETURNING user_id
+    )
+    SELECT eligible.email FROM eligible JOIN issued ON eligible.id=issued.user_id
+  `,[email,resetHash(token)]);
+  // Account existence is never disclosed, and email delivery cannot change the response.
+  response.json({message:"If an eligible account exists, a password reset link will be sent. Check your inbox and spam folder."});
+  if(result.rows[0]){
+    const link = new URL("/reset-password",config.webOrigin);
+    link.hash = "token="+token;
+    try{await sendEmail(result.rows[0].email,"GURA password reset","Use this single-use link within 15 minutes to reset your GURA password: "+link.toString()+"\n\nIf you did not request this, ignore this email.");}
+    catch{console.error("Password recovery email delivery failed.");}
+  }
+}));
+app.post("/api/auth/reset-password", resetSubmitLimit, asyncRoute(async (request,response)=>{
+  const input=z.object({
+    token:z.string().regex(/^[a-f0-9]{64}$/),
+    newPassword:z.string().min(8).max(128).refine(p=>Buffer.byteLength(p,"utf8")<=72,"Password must not exceed 72 UTF-8 bytes."),
+    confirmPassword:z.string().min(1).max(128)
+  }).refine(v=>v.newPassword===v.confirmPassword,{path:["confirmPassword"],message:"New passwords do not match."}).parse(request.body);
+  const digest=resetHash(input.token);
+  const eligible=await query<{user_id:string}>("SELECT t.user_id FROM password_reset_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=$1 AND t.expires_at>now() AND NOT u.suspended",[digest]);
+  if(!eligible.rows[0]){response.status(400).json({error:"This reset link is invalid or expired. Request a new link."});return;}
+  const hashed=await hashPassword(input.newPassword);
+  const changed=await withAuditTransaction(async client=>{
+    const userId=eligible.rows[0].user_id;
+    const locked=await client.query("SELECT id FROM users WHERE id=$1 AND NOT suspended FOR UPDATE",[userId]);
+    if(!locked.rowCount)return false;
+    const consumed=await client.query("DELETE FROM password_reset_tokens WHERE user_id=$1 AND token_hash=$2 AND expires_at>now() RETURNING user_id",[userId,digest]);
+    if(!consumed.rowCount)return false;
+    await client.query("UPDATE users SET password_hash=$1 WHERE id=$2",[hashed,userId]);
+    await client.query("DELETE FROM sessions WHERE user_id=$1",[userId]);
+    await appendAudit(client,{actorId:userId,action:"user.password_reset",subjectType:"user",subjectId:userId,detail:{}});
+    return true;
+  });
+  if(!changed){response.status(400).json({error:"This reset link is invalid or expired. Request a new link."});return;}
+  response.clearCookie("gura_session",{httpOnly:true,sameSite:"lax",secure:config.production,path:"/"});
+  response.json({message:"Password reset successfully. Sign in with your new password."});
+}));
+
 app.post("/api/auth/register", authRateLimit, asyncRoute(async (request, response) => {
   const input = registerSchema.parse(request.body);
   const passwordHash = await hashPassword(input.password);
@@ -114,7 +169,7 @@ app.post("/api/auth/login", authRateLimit, asyncRoute(async (request, response) 
     return;
   }
   const { password_hash: _passwordHash, ...safeUser } = user;
-  await createSession(user.id, response);
+  if(!await createSession(user.id, response, user.password_hash)){response.status(401).json({error:"Email or password is incorrect."});return;}
   response.json({ user: safeUser });
 }));
 
@@ -185,6 +240,7 @@ app.post("/api/auth/change-password", requireUser, asyncRoute(async (request, re
     await client.query("BEGIN");
     await client.query("UPDATE users SET password_hash=$1 WHERE id=$2",[hashed,user.id]);
     await client.query("DELETE FROM sessions WHERE user_id=$1",[user.id]);
+    await client.query("DELETE FROM password_reset_tokens WHERE user_id=$1",[user.id]);
     await client.query("COMMIT");
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
   await destroySession(request,response);
