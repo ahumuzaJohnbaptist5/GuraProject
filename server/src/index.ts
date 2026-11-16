@@ -1,3 +1,4 @@
+import { issueRecoveryTokenSql } from "./passwordRecovery.js";
 import { createHash, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import cookieParser from "cookie-parser";
@@ -79,23 +80,13 @@ app.post("/api/auth/forgot-password", resetRequestLimit, asyncRoute(async (reque
   const {email} = z.object({email:z.string().trim().email().max(320)}).parse(request.body);
   if (!emailDeliveryConfigured) { response.status(503).json({error:"Password recovery email is temporarily unavailable. Please contact GURA support."}); return; }
   const token = randomBytes(32).toString("hex");
-  const result = await query<{email:string}>(`
-    WITH eligible AS (SELECT id,email FROM users WHERE email=lower($1) AND suspended=FALSE),
-    issued AS (
-      INSERT INTO password_reset_tokens(user_id,token_hash,expires_at)
-      SELECT id,$2,now()+interval '15 minutes' FROM eligible
-      ON CONFLICT(user_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,created_at=now(),expires_at=EXCLUDED.expires_at
-      WHERE password_reset_tokens.created_at < now()-interval '1 minute'
-      RETURNING user_id
-    )
-    SELECT eligible.email FROM eligible JOIN issued ON eligible.id=issued.user_id
-  `,[email,resetHash(token)]);
+  const result = await query<{email:string}>(issueRecoveryTokenSql,[email,resetHash(token)]);
   // Account existence is never disclosed, and email delivery cannot change the response.
   response.json({message:"If an eligible account exists, a password reset link will be sent. Check your inbox and spam folder."});
   if(result.rows[0]){
     const link = new URL("/reset-password",config.webOrigin);
     link.hash = "token="+token;
-    try{await sendEmail(result.rows[0].email,"GURA password reset","Use this single-use link within 15 minutes to reset your GURA password: "+link.toString()+"\n\nIf you did not request this, ignore this email.");}
+    try{await sendEmail(result.rows[0].email,"GURA password reset","Use this single-use link within 15 minutes to reset your GURA password: "+link.toString()+"\n\nIf you did not request this, ignore this email.");console.info("Password recovery email accepted by configured transport.");}
     catch{console.error("Password recovery email delivery failed.");}
   }
 }));
@@ -106,14 +97,14 @@ app.post("/api/auth/reset-password", resetSubmitLimit, asyncRoute(async (request
     confirmPassword:z.string().min(1).max(128)
   }).refine(v=>v.newPassword===v.confirmPassword,{path:["confirmPassword"],message:"New passwords do not match."}).parse(request.body);
   const digest=resetHash(input.token);
-  const eligible=await query<{user_id:string}>("SELECT t.user_id FROM password_reset_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=$1 AND t.expires_at>now() AND NOT u.suspended",[digest]);
+  const eligible=await query<{user_id:string}>("SELECT t.user_id FROM gura_password_recovery_tokens_v2 t JOIN users u ON u.id=t.user_id WHERE t.token_hash=$1 AND t.expires_at>now() AND NOT u.suspended",[digest]);
   if(!eligible.rows[0]){response.status(400).json({error:"This reset link is invalid or expired. Request a new link."});return;}
   const hashed=await hashPassword(input.newPassword);
   const changed=await withAuditTransaction(async client=>{
     const userId=eligible.rows[0].user_id;
     const locked=await client.query("SELECT id FROM users WHERE id=$1 AND NOT suspended FOR UPDATE",[userId]);
     if(!locked.rowCount)return false;
-    const consumed=await client.query("DELETE FROM password_reset_tokens WHERE user_id=$1 AND token_hash=$2 AND expires_at>now() RETURNING user_id",[userId,digest]);
+    const consumed=await client.query("DELETE FROM gura_password_recovery_tokens_v2 WHERE user_id=$1 AND token_hash=$2 AND expires_at>now() RETURNING user_id",[userId,digest]);
     if(!consumed.rowCount)return false;
     await client.query("UPDATE users SET password_hash=$1 WHERE id=$2",[hashed,userId]);
     await client.query("DELETE FROM sessions WHERE user_id=$1",[userId]);
@@ -240,7 +231,7 @@ app.post("/api/auth/change-password", requireUser, asyncRoute(async (request, re
     await client.query("BEGIN");
     await client.query("UPDATE users SET password_hash=$1 WHERE id=$2",[hashed,user.id]);
     await client.query("DELETE FROM sessions WHERE user_id=$1",[user.id]);
-    await client.query("DELETE FROM password_reset_tokens WHERE user_id=$1",[user.id]);
+    await client.query("DELETE FROM gura_password_recovery_tokens_v2 WHERE user_id=$1",[user.id]);
     await client.query("COMMIT");
   }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
   await destroySession(request,response);

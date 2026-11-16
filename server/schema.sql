@@ -215,8 +215,9 @@ DROP TRIGGER IF EXISTS secure_audit_no_mutation ON secure_audit_ledger;
 CREATE TRIGGER secure_audit_no_mutation BEFORE UPDATE OR DELETE OR TRUNCATE
 ON secure_audit_ledger FOR EACH STATEMENT EXECUTE FUNCTION protect_secure_audit_ledger();
 
--- Password recovery: only the hash of the random token is stored.
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
+-- Dedicated password recovery storage. Leave any legacy reset-token table untouched.
+-- Only the hash of the random token is stored.
+CREATE TABLE IF NOT EXISTS gura_password_recovery_tokens_v2 (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

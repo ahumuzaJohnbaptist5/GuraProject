@@ -2,6 +2,7 @@
 // Usage: RELEASE_SMOKE_ALLOW_WRITES=1 node scripts/release-smoke.mjs
 import assert from "node:assert/strict";
 import pg from "pg";
+import { issueRecoveryTokenSql } from "../dist/passwordRecovery.js";
 import { randomBytes, createHash, randomUUID } from "node:crypto";
 
 const base = new URL(process.env.RELEASE_SMOKE_BASE_URL || "http://127.0.0.1:8787");
@@ -146,9 +147,18 @@ await check("Password reset expires, works only once, and revokes sessions",asyn
     const digest=createHash("sha256").update(token).digest("hex");
     const next="GuraReset-"+randomUUID()+"!";
     const json={token,newPassword:next,confirmPassword:next};
-    await db.query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,now()-interval '1 minute') ON CONFLICT(user_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at",[uid,digest]);
+    const issued=await db.query(issueRecoveryTokenSql,[email,digest]);
+    assert.equal(issued.rows[0]?.email,email);
+    const cooldown=await db.query(issueRecoveryTokenSql,[email,createHash("sha256").update(randomBytes(32)).digest("hex")]);
+    assert.equal(cooldown.rowCount,0);
+    await db.query("UPDATE gura_password_recovery_tokens_v2 SET created_at=now()-interval '2 minutes' WHERE user_id=$1",[uid]);
+    const reissued=await db.query(issueRecoveryTokenSql,[email,digest]);
+    assert.equal(reissued.rows[0]?.email,email);
+    const unknown=await db.query(issueRecoveryTokenSql,["unknown-"+randomUUID()+"@example.invalid",digest]);
+    assert.equal(unknown.rowCount,0);
+    await db.query("INSERT INTO gura_password_recovery_tokens_v2(user_id,token_hash,expires_at) VALUES($1,$2,now()-interval '1 minute') ON CONFLICT(user_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at",[uid,digest]);
     assert.equal((await call("/api/auth/reset-password",{method:"POST",json})).status,400);
-    await db.query("UPDATE password_reset_tokens SET expires_at=now()+interval '15 minutes' WHERE user_id=$1",[uid]);
+    await db.query("UPDATE gura_password_recovery_tokens_v2 SET expires_at=now()+interval '15 minutes' WHERE user_id=$1",[uid]);
     assert.equal((await call("/api/auth/reset-password",{method:"POST",json:{...json,confirmPassword:"mismatch"}})).status,400);
     assert.equal((await call("/api/auth/reset-password",{method:"POST",json})).status,200);
     assert.equal((await call("/api/auth/reset-password",{method:"POST",json})).status,400);
