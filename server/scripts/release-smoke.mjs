@@ -1,7 +1,8 @@
 // LOCAL/CI ONLY: creates a fresh test account. Never run against production.
 // Usage: RELEASE_SMOKE_ALLOW_WRITES=1 node scripts/release-smoke.mjs
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import pg from "pg";
+import { randomBytes, createHash, randomUUID } from "node:crypto";
 
 const base = new URL(process.env.RELEASE_SMOKE_BASE_URL || "http://127.0.0.1:8787");
 if (process.env.RELEASE_SMOKE_ALLOW_WRITES !== "1" ||
@@ -124,5 +125,36 @@ await check("Logout revokes session in the database", async () => {
   const me = await call("/api/auth/me", { withCookie: true });
   assert.equal(me.status, 200);
   assert.equal(me.body?.user, null);
+});
+await check("Password recovery responses do not disclose account existence",async()=>{
+  const known=await call("/api/auth/forgot-password",{method:"POST",json:{email}});
+  const unknown=await call("/api/auth/forgot-password",{method:"POST",json:{email:"unknown-"+randomUUID()+"@example.invalid"}});
+  assert.ok([200,503].includes(known.status));
+  assert.equal(known.status,unknown.status);
+  assert.deepEqual(known.body,unknown.body);
+});
+await check("Password reset expires, works only once, and revokes sessions",async()=>{
+  const dbUrl=new URL(process.env.DATABASE_URL||"");
+  assert.ok(["127.0.0.1","localhost","::1"].includes(dbUrl.hostname),"Reset fixture database must be local");
+  const db=new pg.Client({connectionString:dbUrl.toString()});
+  await db.connect();
+  try{
+    const login=await call("/api/auth/login",{method:"POST",json:{email,password}});
+    assert.equal(login.status,200); cookie=login.headers.get("set-cookie").split(";")[0];
+    const uid=login.body.user.id;
+    const token=randomBytes(32).toString("hex");
+    const digest=createHash("sha256").update(token).digest("hex");
+    const next="GuraReset-"+randomUUID()+"!";
+    const json={token,newPassword:next,confirmPassword:next};
+    await db.query("INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,now()-interval '1 minute') ON CONFLICT(user_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at",[uid,digest]);
+    assert.equal((await call("/api/auth/reset-password",{method:"POST",json})).status,400);
+    await db.query("UPDATE password_reset_tokens SET expires_at=now()+interval '15 minutes' WHERE user_id=$1",[uid]);
+    assert.equal((await call("/api/auth/reset-password",{method:"POST",json:{...json,confirmPassword:"mismatch"}})).status,400);
+    assert.equal((await call("/api/auth/reset-password",{method:"POST",json})).status,200);
+    assert.equal((await call("/api/auth/reset-password",{method:"POST",json})).status,400);
+    assert.equal((await call("/api/auth/me",{withCookie:true})).body?.user,null);
+    assert.equal((await call("/api/auth/login",{method:"POST",json:{email,password}})).status,401);
+    assert.equal((await call("/api/auth/login",{method:"POST",json:{email,password:next}})).status,200);
+  }finally{await db.end();}
 });
 console.log("GURA core release smoke checks passed.");
