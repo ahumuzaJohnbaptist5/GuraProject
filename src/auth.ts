@@ -33,6 +33,17 @@ const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   return body as T;
 };
 
+export const requestPasswordReset = async (email:string) => {
+  if(!useApi) throw new Error("Password recovery requires the GURA backend.");
+  return apiRequest<{message:string}>("/api/auth/forgot-password",{method:"POST",body:JSON.stringify({email})});
+};
+export const resetPassword = async (token:string,newPassword:string,confirmPassword:string) => {
+  if(!useApi) throw new Error("Password recovery requires the GURA backend.");
+  const result=await apiRequest<{message:string}>("/api/auth/reset-password",{method:"POST",body:JSON.stringify({token,newPassword,confirmPassword})});
+  saveSessionUser(null);
+  return result;
+};
+
 // Reconcile browser-cached user against the authoritative backend session.
 export const refreshSession = async (): Promise<User | null> => {
   if (!useApi) return localAuthAdapter.getCurrentUser();
