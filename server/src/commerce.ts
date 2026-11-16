@@ -18,8 +18,9 @@ const protect = async (req: Request, res: Response, next: NextFunction) => {
     next();
   } catch (error) { next(error); }
 };
-const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
+const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", l.id AS "businessListingId", l.location AS "businessLocation", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
 const pesapalBase = process.env.PESAPAL_ENV === "live" ? "https://pay.pesapal.com/v3/api" : "https://cybqa.pesapal.com/pesapalv3/api";
+const onlineCheckoutEnabled = process.env.GURA_ONLINE_CHECKOUT === "1";
 const pesapalEnabled = Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET && process.env.PESAPAL_IPN_ID);
 class PaymentGatewayError extends Error {
   constructor(readonly providerCode: string) {
@@ -84,7 +85,7 @@ const pesapalToken = async () => {
 };
 commerceRouter.get("/products", asyncRoute(async (_req, res) => {
   const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id LEFT JOIN users u ON u.id = l.owner_id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
-  res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
+  res.json({ products: products.rows, paymentAvailable: onlineCheckoutEnabled && pesapalEnabled });
 }));
 // Server-side catalogue search; /products remains unchanged for older clients.
 const catalogFilters = z.object({
@@ -148,8 +149,9 @@ commerceRouter.post("/my-products", protect, asyncRoute(async (req,res)=>{
   const user=res.locals.user as AuthUser;
   if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
   const data=managedItemSchema.omit({active:true}).parse(req.body);
-  const business=await query<{id:string}>('SELECT id FROM listings WHERE owner_id=$1 ORDER BY created_at ASC LIMIT 1',[user.id]);
+  const business=await query<{id:string;location:string;business_phone:string|null;business_whatsapp:string|null}>('SELECT l.id,l.location,u.business_phone,u.business_whatsapp FROM listings l JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 ORDER BY l.created_at ASC LIMIT 1',[user.id]);
   if (!business.rows[0]){res.status(409).json({error:"Create your business profile before adding inventory."});return;}
+  if (!business.rows[0].location.trim() || !(business.rows[0].business_phone?.trim() || business.rows[0].business_whatsapp?.trim())) { res.status(409).json({error:"Add your public business address and phone or WhatsApp in your dashboard/profile before publishing products."}); return; }
   const productId=await withAuditTransaction(async client=>{
     const result=await client.query<{id:string}>('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,image_urls,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,TRUE) RETURNING id',
       [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrls[0],data.imageUrls,data.condition,data.compatibility]);
@@ -199,6 +201,7 @@ const orderInput = z.object({
   phoneNumber: z.string().trim().regex(/^(?:\+?256|0)7[0-9]{8}$/).optional(),
 });
 commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
+  if (!onlineCheckoutEnabled) { res.status(409).json({error:"Online checkout is paused. Contact the seller directly."}); return; }
   const user = res.locals.user as AuthUser;
   // Any authenticated GURA account may place an order, regardless of account role.
   const input = orderInput.parse(req.body);
@@ -261,6 +264,7 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
 }));
 
 commerceRouter.post("/orders/:id/pay", protect, asyncRoute(async (req,res) => {
+  if (!onlineCheckoutEnabled) { res.status(409).json({error:"Online payments are paused. Your existing order is preserved."}); return; }
   const user = res.locals.user as AuthUser;
   const id = z.string().uuid().parse(req.params.id);
   const order = await query<{id:string;status:string;amount_ugx:number;payment_method:string;phone_number:string|null;payment_tracking_id:string|null}>(

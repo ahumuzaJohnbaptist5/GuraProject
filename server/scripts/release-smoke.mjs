@@ -100,6 +100,18 @@ await check("Customer cannot access administrator audit history", async () => {
   const r = await call("/api/admin/audit/ledger", { withCookie: true });
   assert.equal(r.status, 403);
 });
+await check("Online checkout is paused and new payment requests are blocked", async () => {
+  const products = await call("/api/commerce/products");
+  assert.equal(products.body?.paymentAvailable,false);
+  const order = await call("/api/commerce/orders",{method:"POST",withCookie:true,json:{}});
+  assert.equal(order.status,409);
+  const payment = await call("/api/commerce/orders/"+randomUUID()+"/pay",{method:"POST",withCookie:true,json:{}});
+  assert.equal(payment.status,409);
+  const history=await call("/api/commerce/orders",{withCookie:true});
+  assert.equal(history.status,200);
+  const invalidInquiry=await call("/api/requests",{method:"POST",withCookie:true,json:{listingId:randomUUID(),productId:randomUUID(),title:"Product inquiry",details:"Is it available?"}});
+  assert.equal(invalidInquiry.status,404);
+});
 await check("Cross-origin write is rejected", async () => {
   const r = await call("/api/auth/logout", {
     method: "POST", withCookie: true, requestOrigin: "https://untrusted.example.invalid",

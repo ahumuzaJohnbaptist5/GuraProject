@@ -526,6 +526,7 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
   const user = response.locals.user as AuthUser;
   const input = z.object({
     listingId: z.string().uuid(),
+    productId: z.string().uuid().optional(),
     title: z.string().trim().min(3).max(160),
     details: z.string().trim().min(3).max(4000),
     preferredDate: z.string().date().optional(),
@@ -535,6 +536,12 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
   if (!listing.rows[0]) {
     response.status(404).json({ error: "Listing not found." });
     return;
+  }
+  if (input.productId) {
+    const product = await query<{name:string}>("SELECT name FROM marketplace_products WHERE id=$1 AND business_listing_id=$2 AND active=TRUE AND is_demo=FALSE", [input.productId,input.listingId]);
+    if (!product.rows[0] || !listing.rows[0].owner_id) { response.status(404).json({error:"Product or seller is no longer available."}); return; }
+    if (listing.rows[0].owner_id === user.id) { response.status(400).json({error:"You cannot send an inquiry to your own business."}); return; }
+    input.title = ("Product inquiry: " + product.rows[0].name).slice(0,160);
   }
   const createdRequest = await withAuditTransaction(async client=>{
     const result = await client.query(
@@ -547,7 +554,7 @@ app.post("/api/requests", requireUser, asyncRoute(async (request, response) => {
       [user.id, listing.rows[0].owner_id, input.listingId, input.title, input.details, input.preferredDate || null, input.preferredTime || null],
     );
     await appendAudit(client,{actorId:user.id,action:"service_request.created",
-      subjectType:"service_request",subjectId:result.rows[0].id,detail:{listingId:input.listingId}});
+      subjectType:"service_request",subjectId:result.rows[0].id,detail:{listingId:input.listingId,...(input.productId?{productId:input.productId}:{})}});
     return result.rows[0];
   });
   response.status(201).json({ request: createdRequest });
