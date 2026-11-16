@@ -18,8 +18,9 @@ const protect = async (req: Request, res: Response, next: NextFunction) => {
     next();
   } catch (error) { next(error); }
 };
-const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
+const productFields = 'p.id, p.sku, p.name, p.description, p.category, p.price_ugx AS "priceUgx", p.available_units AS "availableUnits", p.image_url AS "imageUrl", p.image_urls AS "imageUrls", p.condition, p.compatibility, p.specifications, p.is_demo AS "isDemo", l.name AS "businessName", l.id AS "businessListingId", l.location AS "businessLocation", u.business_phone AS "businessPhone", u.business_whatsapp AS "businessWhatsapp", u.business_email AS "businessEmail", (l.verified AND l.moderation_status = \'approved\') AS "sellerVerified"';
 const pesapalBase = process.env.PESAPAL_ENV === "live" ? "https://pay.pesapal.com/v3/api" : "https://cybqa.pesapal.com/pesapalv3/api";
+const onlineCheckoutEnabled = process.env.GURA_ONLINE_CHECKOUT === "1";
 const pesapalEnabled = Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET && process.env.PESAPAL_IPN_ID);
 class PaymentGatewayError extends Error {
   constructor(readonly providerCode: string) {
@@ -84,7 +85,7 @@ const pesapalToken = async () => {
 };
 commerceRouter.get("/products", asyncRoute(async (_req, res) => {
   const products = await query('SELECT ' + productFields + ' FROM marketplace_products p JOIN listings l ON p.business_listing_id = l.id LEFT JOIN users u ON u.id = l.owner_id WHERE p.active = TRUE AND p.is_demo = FALSE AND l.moderation_status IN (\'pending\',\'approved\') ORDER BY p.created_at DESC');
-  res.json({ products: products.rows, paymentAvailable: pesapalEnabled });
+  res.json({ products: products.rows, paymentAvailable: onlineCheckoutEnabled && pesapalEnabled });
 }));
 // Server-side catalogue search; /products remains unchanged for older clients.
 const catalogFilters = z.object({
@@ -199,6 +200,7 @@ const orderInput = z.object({
   phoneNumber: z.string().trim().regex(/^(?:\+?256|0)7[0-9]{8}$/).optional(),
 });
 commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
+  if (!onlineCheckoutEnabled) { res.status(409).json({error:"Online checkout is paused. Contact the seller directly."}); return; }
   const user = res.locals.user as AuthUser;
   // Any authenticated GURA account may place an order, regardless of account role.
   const input = orderInput.parse(req.body);
@@ -261,6 +263,7 @@ commerceRouter.post("/orders", protect, asyncRoute(async (req, res) => {
 }));
 
 commerceRouter.post("/orders/:id/pay", protect, asyncRoute(async (req,res) => {
+  if (!onlineCheckoutEnabled) { res.status(409).json({error:"Online payments are paused. Your existing order is preserved."}); return; }
   const user = res.locals.user as AuthUser;
   const id = z.string().uuid().parse(req.params.id);
   const order = await query<{id:string;status:string;amount_ugx:number;payment_method:string;phone_number:string|null;payment_tracking_id:string|null}>(
