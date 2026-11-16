@@ -27,14 +27,18 @@ const sendWithResend = async (to: string, subject: string, text: string) => {
   }
 };
 
-const sendEmail = async (to: string, subject: string, text: string) => {
+export const emailDeliveryConfigured = Boolean((config.email.resendApiKey && config.email.resendFrom) || mailer);
+
+export const sendEmail = async (to: string, subject: string, text: string) => {
   if (config.email.resendApiKey && config.email.resendFrom) {
     await sendWithResend(to, subject, text);
     return;
   }
   if (mailer) {
     await mailer.sendMail({ from: config.email.from, to, subject, text });
+    return;
   }
+  throw new Error("Email delivery not configured.");
 };
 
 export const createNotification = async (userId: string, title: string, body: string) => {
