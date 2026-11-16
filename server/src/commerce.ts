@@ -149,8 +149,9 @@ commerceRouter.post("/my-products", protect, asyncRoute(async (req,res)=>{
   const user=res.locals.user as AuthUser;
   if (!["shop","technician"].includes(user.role)){res.status(403).json({error:"Provider account required."});return;}
   const data=managedItemSchema.omit({active:true}).parse(req.body);
-  const business=await query<{id:string}>('SELECT id FROM listings WHERE owner_id=$1 ORDER BY created_at ASC LIMIT 1',[user.id]);
+  const business=await query<{id:string;location:string;business_phone:string|null;business_whatsapp:string|null}>('SELECT l.id,l.location,u.business_phone,u.business_whatsapp FROM listings l JOIN users u ON u.id=l.owner_id WHERE l.owner_id=$1 ORDER BY l.created_at ASC LIMIT 1',[user.id]);
   if (!business.rows[0]){res.status(409).json({error:"Create your business profile before adding inventory."});return;}
+  if (!business.rows[0].location.trim() || !(business.rows[0].business_phone?.trim() || business.rows[0].business_whatsapp?.trim())) { res.status(409).json({error:"Add your public business address and phone or WhatsApp in your dashboard/profile before publishing products."}); return; }
   const productId=await withAuditTransaction(async client=>{
     const result=await client.query<{id:string}>('INSERT INTO marketplace_products (owner_id,business_listing_id,sku,name,description,category,price_ugx,available_units,image_url,image_urls,condition,compatibility,is_demo,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,TRUE) RETURNING id',
       [user.id,business.rows[0].id,"GURA-"+randomUUID().slice(0,12).toUpperCase(),data.name,data.description,data.category,data.priceUgx,data.availableUnits,data.imageUrls[0],data.imageUrls,data.condition,data.compatibility]);
